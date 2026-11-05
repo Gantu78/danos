@@ -1,0 +1,87 @@
+@page "/mapa"
+@model MapaModel
+@{
+    ViewData["Titulo"] = Model.Desastre?.Nombre ?? "Mapa de calor";
+}
+
+@section Cabecera {
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+}
+
+<div class="tablero">
+    <header class="cabecera-mapa">
+        <p class="volver">Evaluación de daños · mapa de calor</p>
+        <h1 class="titulo">@(Model.Desastre?.Nombre ?? "Sin desastres sembrados")</h1>
+        <form method="get" class="filtros" aria-label="Filtros del mapa">
+            <label>Desastre
+                <select name="desastreId" onchange="this.form.submit()">
+                    @foreach (var d in Model.Desastres)
+                    {
+                        <option value="@d.Id" selected="@(d.Id == Model.DesastreId)">@d.Nombre</option>
+                    }
+                </select>
+            </label>
+            <label>Nivel mínimo
+                <select name="nivelMinimo" onchange="this.form.submit()">
+                    @foreach (var n in Enum.GetValues<NivelDano>())
+                    {
+                        <option value="@n" selected="@(n.ToString() == Model.NivelMinimo)">@MapaModel.Etiqueta(n)</option>
+                    }
+                </select>
+            </label>
+            <noscript><button type="submit" class="boton">Ver</button></noscript>
+        </form>
+    </header>
+
+    @if (Model.Desastre != null)
+    {
+        <div id="mapa" class="mapa"
+             data-url="/v1/mapa-calor?desastreId=@Model.DesastreId&amp;nivelMinimo=@Model.NivelMinimo"
+             aria-label="Mapa de calor de los daños"></div>
+
+        <aside class="panel">
+            <section class="bloque" aria-labelledby="t-escala">
+                <h2 id="t-escala" class="subtitulo">Activos por nivel de daño</h2>
+                <ol class="escala">
+                    @foreach (var n in Enum.GetValues<NivelDano>())
+                    {
+                        <li class="nivel nivel-@n" data-nivel="@n">
+                            <span class="cuenta">0</span>
+                            <span class="nombre">@MapaModel.Etiqueta(n)</span>
+                        </li>
+                    }
+                </ol>
+                <p class="vivo" id="estado-vivo" aria-live="polite">Cargando datos…</p>
+            </section>
+
+            <section class="bloque" aria-labelledby="t-cifras">
+                <h2 id="t-cifras" class="subtitulo">Sincronización</h2>
+                <dl class="cifras">
+                    <div><dt>Datos a las</dt><dd id="hora-dato">--:--:--</dd></div>
+                    <div><dt>Conflictos pendientes</dt><dd id="conflictos">0</dd></div>
+                </dl>
+                <label class="interruptor">
+                    <input type="checkbox" id="ver-puntos" checked>
+                    Mostrar cada activo (borde rojo punteado = conflicto pendiente)
+                </label>
+            </section>
+
+            <section class="bloque">
+                <h2 class="subtitulo">Cómo se calcula</h2>
+                <p class="ayuda">Un punto por activo con el nivel de su evaluación vigente. Peso: sin daño 0,
+                    leve 0,25, moderado 0,5, grave 0,75, destrucción total 1. Se actualiza cada 10 segundos.</p>
+            </section>
+        </aside>
+    }
+</div>
+
+@section Scripts {
+    @if (Model.Desastre != null)
+    {
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+                integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+        <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+        <script src="~/js/calor.js" asp-append-version="true"></script>
+    }
+}
