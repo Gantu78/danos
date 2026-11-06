@@ -1,0 +1,16 @@
+flowchart LR
+    Evaluador(["Evaluador de campo"])
+    Coordinador(["Coordinador de emergencia"])
+    subgraph Sistema["Sistema de evaluación de daños"]
+        App["App móvil DanosCampo<br/>Android · offline-first"]
+        API["Sistema central<br/>API Evaluación de Daños"]
+        Mapa["Mapa de calor<br/>página web"]
+    end
+    OSM[("OpenStreetMap<br/>teselas del mapa")]
+    GPS[("GNSS del teléfono")]
+    Evaluador -- "registra posición, nivel 1-5 y fotos" --> App
+    GPS -- "lat, lon, precisión" --> App
+    App -- "descarga y sincroniza cuando hay red" --> API
+    Coordinador -- "consulta regiones afectadas" --> Mapa
+    Mapa -- "puntos por desastre" --> API
+    Mapa -- "teselas" --> OSM

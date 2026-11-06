@@ -1,0 +1,22 @@
+flowchart LR
+    subgraph Tel["Celular o tablet · Android 8+"]
+        APK["DanosCampo.apk"]
+        SQLite[("SQLite<br/>réplica + cola")]
+        Fotos[("filesDir/evidencias")]
+        APK --- SQLite
+        APK --- Fotos
+    end
+    subgraph Srv["PC o servidor · Docker Compose"]
+        subgraph CA["contenedor api"]
+            Kestrel["ASP.NET Core<br/>Kestrel :5080"]
+            VolE[("volumen evidencias")]
+        end
+        subgraph CB["contenedor db"]
+            PG[("PostgreSQL 18<br/>volumen datos")]
+        end
+        Kestrel -- "TCP 5432" --> PG
+        Kestrel --- VolE
+    end
+    Nav["Navegador del coordinador"]
+    APK -- "HTTP :5080 · Wi-Fi o datos<br/>(10.0.2.2 desde el emulador)" --> Kestrel
+    Nav -- "HTTP :5080/mapa" --> Kestrel

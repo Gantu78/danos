@@ -1,0 +1,21 @@
+flowchart LR
+    Ev(["Evaluador"])
+    Co(["Coordinador"])
+    subgraph Sistema["Sistema de evaluación de daños"]
+        direction TB
+        CU1(["CU-01 Configurar y probar conexión"])
+        CU2(["CU-02 Descargar catálogo y activos"])
+        CU3(["CU-03 Registrar evaluación sin red"])
+        CU4(["CU-04 Sincronizar al volver la red"])
+        CU5(["CU-05 Editar evaluación propia"])
+        CU6(["CU-06 Detectar conflicto o duplicado"])
+        CU7(["CU-07 Consultar mapa de calor"])
+    end
+    Ev --- CU1
+    Ev --- CU2
+    Ev --- CU3
+    Ev --- CU5
+    CU3 -. "include" .-> CU4
+    CU5 -. "include" .-> CU4
+    CU6 -. "extend" .-> CU4
+    Co --- CU7

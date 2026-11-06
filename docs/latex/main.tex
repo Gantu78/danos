@@ -1,0 +1,220 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[spanish,es-noshorthands,es-tabla]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{rotating}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{array}
+
+\graphicspath{{diagramas/}}
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\title{Documento de diseño\\ \large Evaluación de daños en sitios de desastre}
+\author{Carlos Daniel Guiza \and Juan Felipe Rubiano \and Samuel Gantiva}
+\date{Noviembre de 2026}
+
+\begin{document}
+\sloppy
+\maketitle
+
+\section{Descripción general}
+
+El sistema permite registrar la posición (latitud y longitud) y el nivel de afectación (de 1 a 5) de
+sitios afectados por un desastre. Tiene tres partes:
+
+\begin{itemize}
+  \item Una app Android que funciona sin internet y guarda todo en el teléfono.
+  \item Un sistema central (API en .NET con PostgreSQL) que recibe la información cuando vuelve la red.
+  \item Una página con un mapa de calor que muestra las zonas más afectadas de cada desastre.
+\end{itemize}
+
+Lo más importante del diseño es que no se pierda ni se sobrescriba información al sincronizar, aunque
+varios evaluadores trabajen sin red sobre el mismo sitio. Para eso la app guarda una cola de
+operaciones y el servidor detecta los conflictos sin resolverlos.
+
+El diseño se describe con el modelo de vistas 4+1 de Kruchten, más un diagrama de contexto.
+
+\section{Diagrama de contexto}
+
+El evaluador usa la app en campo y la app toma la posición del GPS del teléfono. Cuando hay red, la app
+descarga el catálogo y sincroniza con el sistema central. El coordinador ve el mapa de calor desde un
+navegador; el mapa base sale de OpenStreetMap.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{01-contexto}
+  \caption{Diagrama de contexto}
+\end{figure}
+
+\section{Vista lógica}
+
+La figura~\ref{fig:logica} muestra las clases principales del dominio.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=\textheight,height=0.8\textwidth,keepaspectratio]{02-vista-logica}
+  \caption{Vista lógica}
+  \label{fig:logica}
+\end{sidewaysfigure}
+
+\begin{itemize}
+  \item \textbf{Evaluación}: lo que registra el evaluador sobre un activo (posición, precisión, nivel,
+        descripción y fotos). Su id es un UUID generado en el teléfono.
+  \item \textbf{Activo}: el sitio o bien evaluado (vivienda, escuela, puente, etc.). Tiene una versión que
+        aumenta cada vez que el servidor acepta una evaluación sobre él.
+  \item \textbf{TipoActivo} y \textbf{CriterioNivel}: catálogo que se descarga; cada tipo describe qué
+        significa cada nivel de 1 a 5.
+  \item \textbf{Desastre}: agrupa evaluaciones. Si una evaluación no tiene desastre queda como preliminar y
+        no sale en el mapa de calor.
+  \item \textbf{Evidencia}: foto con su ubicación, fecha y hash SHA-256.
+  \item \textbf{Operación}: elemento de la cola de envío (crear o actualizar) con una copia completa de la
+        evaluación.
+  \item \textbf{Conflicto}: lo crea el servidor cuando una evaluación choca con otra.
+\end{itemize}
+
+Cada evaluación tiene dos estados. El estado de sincronización es solo local: \texttt{PENDIENTE} mientras
+no hay respuesta del servidor, \texttt{CONFIRMADA} cuando el servidor la recibió e \texttt{INVALIDA} si la
+rechazó. El estado de la evaluación lo decide el servidor: \texttt{PRELIMINAR}, \texttt{REGISTRADA},
+\texttt{EN\_CONFLICTO}, \texttt{VALIDADA} o \texttt{RECHAZADA}.
+
+\subsection*{Reglas}
+
+\begin{itemize}
+  \item Una operación solo se borra de la cola cuando el servidor respondió por ella.
+  \item Una operación que ya se intentó enviar no se modifica. Si el usuario edita después, se crea una
+        operación nueva.
+  \item La app nunca resuelve conflictos, solo muestra lo que dice el servidor.
+\end{itemize}
+
+\textbf{Conflicto.} Cada operación lleva la versión del activo que tenía el teléfono ($b$). Hay conflicto si
+el activo tiene una versión mayor que $b$ hecha por otro dispositivo:
+\[
+  \exists\, v : \; n_v > b \;\wedge\; d_v \neq d
+\]
+donde $n_v$ es el número de la versión, $d_v$ el dispositivo que la hizo y $d$ el dispositivo que envía.
+Las versiones del mismo dispositivo no cuentan. Cuando hay conflicto el servidor guarda las dos versiones
+y no cambia la vigente.
+
+\textbf{Duplicados.} Un activo nuevo se marca como posible duplicado si hay otra evaluación a menos de
+25 m (distancia de Haversine) en un rango de 24 horas.
+
+\textbf{Mapa de calor.} Se toma un punto por activo con el nivel de su evaluación vigente. El peso es 0,
+0,25, 0,5, 0,75 y 1 para los niveles 1 a 5.
+
+\section{Vista de procesos}
+
+La figura~\ref{fig:procesos} muestra qué pasa desde que el evaluador guarda hasta que el servidor
+responde.
+
+\begin{sidewaysfigure}
+  \centering
+  \includegraphics[width=\textheight,height=0.8\textwidth,keepaspectratio]{03-vista-procesos}
+  \caption{Vista de procesos}
+  \label{fig:procesos}
+\end{sidewaysfigure}
+
+\begin{enumerate}
+  \item Al guardar, la app escribe en una sola transacción la evaluación, las fotos y una operación en la
+        cola, y programa un trabajo de WorkManager que solo se ejecuta cuando hay red. Sin red el proceso
+        termina ahí y la evaluación queda pendiente.
+  \item Cuando vuelve la red, el trabajo toma hasta 20 operaciones y las envía en un lote.
+  \item El servidor procesa cada operación en su propia transacción. Si ya había recibido esa operación
+        (mismo \texttt{idOperacion}) devuelve la misma respuesta, así que reenviar no duplica nada.
+  \item La app aplica cada resultado: \texttt{APLICADA} confirma la evaluación, \texttt{EN\_CONFLICTO} y
+        \texttt{POSIBLE\_DUPLICADO} la confirman pero la marcan en conflicto, e \texttt{INVALIDA} muestra
+        el motivo para que el usuario la corrija.
+  \item Al final se suben las fotos de las evaluaciones confirmadas.
+\end{enumerate}
+
+Si no hay red o el servidor responde con error 5xx, el trabajo se reintenta más tarde con espera
+exponencial. Si responde con error 4xx, se guarda el error y no se reintenta en bucle.
+
+\section{Vista de desarrollo}
+
+El repositorio tiene dos proyectos: la app y el API. Los dos están organizados por capas y solo se
+comunican por el contrato REST.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{04-vista-desarrollo}
+  \caption{Vista de desarrollo}
+\end{figure}
+
+\textbf{App (Kotlin).} \texttt{presentacion} tiene las pantallas en Jetpack Compose y los ViewModel;
+\texttt{acceso} tiene los repositorios, que son la única forma de llegar a los datos; \texttt{dominio}
+tiene los modelos y validaciones sin dependencias de Android; \texttt{infraestructura} tiene Room, Retrofit,
+WorkManager, GPS y cámara. Las dependencias se inyectan con Hilt.
+
+\textbf{API (.NET 10).} \texttt{Acceso} tiene los controladores y la página del mapa; \texttt{Dominio} tiene
+los servicios y las reglas de conflicto y duplicados; \texttt{Infraestructura} tiene Entity Framework Core
+y el almacenamiento de fotos.
+
+Endpoints principales:
+
+\begin{center}
+\begin{tabular}{|P{6.5cm}|P{8cm}|}
+  \hline
+  \texttt{GET /v1/descarga} & Catálogo, desastres y activos \\ \hline
+  \texttt{POST /v1/sincronizacion/evaluaciones} & Recibe un lote de operaciones \\ \hline
+  \texttt{PUT /v1/evidencias/\{id\}} & Recibe una foto \\ \hline
+  \texttt{GET /v1/mapa-calor} & Puntos del mapa de calor \\ \hline
+  \texttt{GET /mapa} & Página del mapa de calor \\ \hline
+\end{tabular}
+\end{center}
+
+\section{Vista física}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{05-vista-fisica}
+  \caption{Vista física}
+\end{figure}
+
+La app corre en el celular o tablet y guarda sus datos en SQLite. El sistema central corre con Docker
+Compose en dos contenedores: uno con el API (puerto 5080) y otro con PostgreSQL. El coordinador abre el
+mapa desde el navegador. Desde el emulador de Android el servidor se ve en \texttt{10.0.2.2:5080}; desde
+un celular se usa la IP del PC en la misma red Wi-Fi.
+
+\section{Escenarios}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{06-escenarios}
+  \caption{Casos de uso}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{CU-01 Configurar}: el evaluador escribe su nombre, organización y la URL del servidor, y
+        puede probar la conexión.
+  \item \textbf{CU-02 Descargar}: con red, descarga tipos de activo, desastres y activos.
+  \item \textbf{CU-03 Registrar sin red}: elige o crea el activo, la app toma el GPS, elige el nivel de 1 a
+        5, el desastre, una descripción y fotos, y guarda.
+  \item \textbf{CU-04 Sincronizar}: al volver la red las evaluaciones se envían solas.
+  \item \textbf{CU-05 Editar}: modifica una evaluación propia y se vuelve a sincronizar.
+  \item \textbf{CU-06 Detectar conflicto}: el servidor detecta conflictos o duplicados y guarda ambas
+        versiones.
+  \item \textbf{CU-07 Ver mapa de calor}: el coordinador elige un desastre y ve las zonas más afectadas.
+\end{itemize}
+
+El escenario CU-03 + CU-04 recorre todas las vistas: usa las clases Evaluación y Operación (lógica), el
+trabajo de WorkManager y el servidor (procesos), las capas de la app y del API (desarrollo) y los dos
+nodos (física).
+
+\section{Decisiones de diseño}
+
+\begin{itemize}
+  \item Se guarda una copia completa de los datos en el teléfono para poder trabajar sin internet.
+  \item Los ids se generan en el teléfono (UUID) para poder crear registros sin red.
+  \item El servidor detecta los conflictos y no los resuelve, para no perder la versión de nadie.
+  \item El conflicto se decide por la versión del activo y no por la hora del teléfono, porque los relojes
+        de los celulares pueden estar mal.
+  \item Las fotos se suben aparte del lote para que el envío sea liviano.
+  \item El sistema central se despliega con Docker Compose para levantarlo con un solo comando.
+\end{itemize}
+
+\end{document}

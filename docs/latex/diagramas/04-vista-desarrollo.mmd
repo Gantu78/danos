@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph Repo["Repositorio danos"]
+        direction LR
+        subgraph APP["app/ · Android (Kotlin)"]
+            direction TB
+            P["presentacion<br/>Compose · ViewModel · navegación"]
+            A["acceso<br/>repositorios"]
+            I["infraestructura<br/>local (Room) · remoto (Retrofit) · sync (WorkManager)<br/>dispositivo · preferencias · di (Hilt)"]
+            D["dominio<br/>modelos · NivelDano · ValidadorEvaluacion"]
+            P --> A --> I
+            P -.-> D
+            A -.-> D
+            I -.-> D
+        end
+        subgraph SRV["api/ · ASP.NET Core (.NET 10)"]
+            direction TB
+            AC["Acceso<br/>controladores · DTO · FiltroEncabezados · /mapa"]
+            DO["Dominio<br/>servicios · ReglaConflicto · DetectorDuplicados · validador"]
+            IN["Infraestructura<br/>EF Core · migraciones · semilla · archivos"]
+            AC --> DO --> IN
+        end
+        DOCS["docs/ · diseño"]
+        DC["docker-compose.yml"]
+    end
+    APP -- "contrato REST JSON" --> SRV
+    DC -. "construye" .-> SRV

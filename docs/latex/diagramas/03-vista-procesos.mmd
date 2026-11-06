@@ -1,0 +1,33 @@
+sequenceDiagram
+    autonumber
+    actor E as Evaluador
+    participant App as App (UI + ViewModel)
+    participant DB as Room (réplica + cola)
+    participant W as SincronizacionWorker
+    participant API as API Evaluación de Daños
+    participant PG as PostgreSQL
+    E->>App: registra posición, nivel 1-5, descripción y fotos
+    App->>DB: guarda evaluación + evidencias + operación CREAR (una transacción)
+    App->>W: encola trabajo único con restricción CONNECTED
+    Note over E,DB: sin red todo termina aquí: la evaluación queda PENDIENTE
+    Note over W: al volver la red, WorkManager ejecuta el trabajo
+    loop mientras haya operaciones y avance
+        W->>DB: toma ≤ 20 operaciones e incrementa intentos
+        W->>API: POST /v1/sincronizacion/evaluaciones
+        loop cada operación (transacción propia)
+            API->>PG: ¿idOperacion ya procesada? → devuelve el mismo resultado
+            API->>API: valida · regla de conflicto · posibles duplicados
+            API->>PG: guarda evaluación o versión en conflicto + resultado
+        end
+        alt 2xx
+            API-->>W: APLICADA · EN_CONFLICTO · POSIBLE_DUPLICADO · INVALIDA
+            W->>DB: aplica cada resultado y retira la operación
+        else sin red o 5xx
+            W-->>W: reintento con espera exponencial (30 s)
+        else 4xx
+            W->>DB: guarda ultimoError y se detiene
+        end
+    end
+    W->>API: PUT /v1/evidencias/{id} (fotos de evaluaciones confirmadas)
+    API-->>W: 2xx subida · 422 hash distinto
+    App-->>E: la tarjeta pasa a Confirmada (o En conflicto)

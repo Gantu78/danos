@@ -6,7 +6,9 @@ App móvil que registra la **posición (lat/lon)** y el **nivel de afectación (
 
 | Entregable | Dónde |
 | --- | --- |
-| Diseño | [docs/DISENO.md](docs/DISENO.md) |
+| Diseño (PDF) | [docs/DISENO.pdf](docs/DISENO.pdf) |
+| Diseño (LaTeX para Overleaf) | [docs/latex/](docs/latex/): `main.tex`, diagramas Mermaid y `DanosCampo-diseno-overleaf.zip` |
+| Diseño (resumen en Markdown) | [docs/DISENO.md](docs/DISENO.md) |
 | Código de la app Android | [app/](app/) (Kotlin, Jetpack Compose) |
 | Código del sistema central | [api/](api/) (ASP.NET Core .NET 10 + PostgreSQL) |
 | APK para pruebas | [entrega/DanosCampo.apk](entrega/DanosCampo.apk) |

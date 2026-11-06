@@ -1,0 +1,90 @@
+classDiagram
+    direction LR
+    class Evaluacion {
+        +UUID id
+        +Instant instanteCampo
+        +String evaluador
+        +String organizacion
+        +double lat
+        +double lon
+        +double precisionM
+        +NivelDano nivelDano
+        +String descripcion
+        +EstadoEvaluacion estadoEvaluacion
+        +EstadoSync estadoSync
+        +String motivoInvalida
+    }
+    class Activo {
+        +UUID id
+        +String referencia
+        +double lat
+        +double lon
+        +int version
+    }
+    class TipoActivo {
+        +String codigo
+        +String nombre
+    }
+    class CriterioNivel {
+        +NivelDano nivel
+        +String criterio
+    }
+    class Desastre {
+        +UUID id
+        +String nombre
+        +String tipo
+    }
+    class Evidencia {
+        +UUID id
+        +double lat
+        +double lon
+        +Instant instanteCaptura
+        +String sha256
+        +long tamanoBytes
+        +bool subida
+    }
+    class Operacion {
+        +UUID idOperacion
+        +TipoOperacion tipo
+        +int versionBaseActivo
+        +String payloadJson
+        +int intentos
+    }
+    class Conflicto {
+        +TipoConflicto tipo
+        +String regla
+        +EstadoConflicto estado
+    }
+    class NivelDano {
+        <<enumeration>>
+        1 SIN_DANO
+        2 LEVE
+        3 MODERADO
+        4 GRAVE
+        5 DESTRUCCION_TOTAL
+    }
+    class EstadoEvaluacion {
+        <<enumeration>>
+        PRELIMINAR
+        REGISTRADA
+        EN_CONFLICTO
+        VALIDADA
+        RECHAZADA
+    }
+    class EstadoSync {
+        <<enumeration>>
+        PENDIENTE
+        CONFIRMADA
+        INVALIDA
+    }
+    Activo "1" <-- "*" Evaluacion : evalúa
+    TipoActivo "1" <-- "*" Activo : clasifica
+    TipoActivo "1" *-- "5" CriterioNivel : define
+    Desastre "0..1" <-- "*" Evaluacion : agrupa
+    Evaluacion "1" *-- "*" Evidencia : tiene
+    Evaluacion "1" <-- "*" Operacion : cola de salida
+    Conflicto "*" --> "1" Activo : sobre
+    Conflicto "*" --> "1..2" Evaluacion : vigente y entrante
+    Evaluacion ..> NivelDano
+    Evaluacion ..> EstadoEvaluacion
+    Evaluacion ..> EstadoSync
