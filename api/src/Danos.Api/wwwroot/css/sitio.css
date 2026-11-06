@@ -1,0 +1,138 @@
+/* Paleta del taller de mapas (carta hidrográfica): el color fuerte lo ponen solo los niveles de daño. */
+:root {
+    --niebla: #eef2f3;
+    --papel: #ffffff;
+    --tinta: #1c2b36;
+    --apagado: #566a75;
+    --curva: #c9d6dc;
+    --rio: #1f5f7a;
+    --rio-oscuro: #16475c;
+    --n-sin: #2e9e44;
+    --n-leve: #e8c21a;
+    --n-moderado: #ef7d22;
+    --n-grave: #d62f2f;
+    --n-total: #5b1414;
+    --alerta: #9b2c1f;
+
+    --letra: "Barlow", system-ui, sans-serif;
+    --letra-estrecha: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--niebla);
+    color: var(--tinta);
+    font: 400 1rem/1.5 var(--letra);
+}
+
+a { color: var(--rio); }
+:focus-visible { outline: 3px solid var(--rio); outline-offset: 2px; }
+
+.titulo {
+    font: 700 clamp(1.75rem, 3.5vw, 2.6rem)/1 var(--letra-estrecha);
+    letter-spacing: -.01em;
+    margin: 0;
+}
+
+.subtitulo {
+    font: 600 1.2rem/1.2 var(--letra-estrecha);
+    margin: 0 0 .75rem;
+}
+
+.ayuda { color: var(--apagado); font-size: .9rem; margin: 0; }
+
+select, input {
+    font: inherit;
+    color: inherit;
+    padding: .45rem .6rem;
+    border: 1px solid var(--curva);
+    border-radius: 4px;
+    background: var(--papel);
+}
+
+.boton {
+    font: 600 1rem/1 var(--letra-estrecha);
+    padding: .6rem 1rem;
+    border: 0;
+    border-radius: 4px;
+    background: var(--rio);
+    color: #fff;
+    cursor: pointer;
+}
+
+/* ---------- Tablero ---------- */
+
+.tablero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+        "cabecera cabecera"
+        "mapa     panel";
+    min-height: 100vh;
+}
+
+.cabecera-mapa {
+    grid-area: cabecera;
+    padding: 1rem clamp(1rem, 3vw, 2rem) 1.1rem;
+    border-bottom: 1px solid var(--curva);
+    background: var(--papel);
+}
+.volver { font-size: .9rem; color: var(--apagado); margin: 0 0 .35rem; }
+
+.filtros { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin-top: .75rem; }
+.filtros label { display: grid; gap: .2rem; font-size: .85rem; font-weight: 500; color: var(--apagado); }
+
+/* Sin height: 100%: la fila 1fr del grid estira el contenedor y Leaflet lee su tamaño real. */
+.mapa { grid-area: mapa; min-height: 60vh; }
+
+.panel {
+    grid-area: panel;
+    background: var(--papel);
+    border-left: 1px solid var(--curva);
+    overflow-y: auto;
+    max-height: calc(100vh - 8rem);
+}
+.bloque { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--curva); }
+
+/* La escala es a la vez la leyenda del mapa y el conteo por nivel. */
+.escala {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+}
+.nivel { display: grid; gap: .1rem; padding: .5rem .4rem; border-top: 6px solid; }
+.nivel-SIN_DANO { border-color: var(--n-sin); }
+.nivel-LEVE { border-color: var(--n-leve); }
+.nivel-MODERADO { border-color: var(--n-moderado); }
+.nivel-GRAVE { border-color: var(--n-grave); }
+.nivel-DESTRUCCION_TOTAL { border-color: var(--n-total); }
+.nivel .cuenta { font: 700 1.8rem/1 var(--letra-estrecha); font-variant-numeric: tabular-nums; }
+.nivel .nombre { font-size: .78rem; color: var(--apagado); line-height: 1.2; }
+
+.vivo { font-size: .85rem; color: var(--apagado); margin: .6rem 0 0; }
+.vivo-error { color: var(--alerta); }
+
+.cifras { display: flex; gap: 1.75rem; margin: 0 0 .75rem; }
+.cifras dt { font-size: .85rem; color: var(--apagado); }
+.cifras dd { margin: 0; font: 600 1.35rem/1.2 var(--letra-estrecha); font-variant-numeric: tabular-nums; }
+
+.interruptor { display: flex; gap: .5rem; align-items: flex-start; font-size: .9rem; }
+.interruptor input { margin-top: .25rem; }
+
+.popup strong { font: 600 1rem var(--letra-estrecha); }
+.popup p { margin: .35rem 0 0; }
+.popup-alerta { color: var(--alerta); font-size: .85rem; }
+
+@media (max-width: 900px) {
+    .tablero {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "cabecera" "mapa" "panel";
+    }
+    .mapa { height: 60vh; }
+    .panel { border-left: 0; max-height: none; }
+}

@@ -1,0 +1,236 @@
+### Pruebas manuales del microservicio de Evaluación de Daños.
+### Se abre en Visual Studio, Rider o VS Code (extensión REST Client) con el API corriendo:
+###   dotnet run --project src/Danos.Api --launch-profile http
+### Todo /v1/* exige X-Usuario, X-Organizacion y X-Dispositivo (400 si falta alguno).
+
+@base = http://localhost:5080
+@dispositivo = celular-ana
+@desastre = d0000000-0000-0000-0000-000000000001
+@activo = b0000000-0000-0000-0000-000000000010
+@evaluacion = e0000000-0000-0000-0000-000000000001
+@evidencia = f0000000-0000-0000-0000-000000000001
+
+### Salud
+GET {{base}}/salud
+
+### Descarga previa: catálogo con criterios, desastres y activos con su versión
+GET {{base}}/v1/descarga?desastreId={{desastre}}
+X-Usuario: Ana Pérez
+X-Organizacion: Cruz Roja
+X-Dispositivo: {{dispositivo}}
+
+### Sin encabezados → 400
+GET {{base}}/v1/descarga
+
+### Sincronización: CREAR de un activo nuevo registrado en campo (el API no siembra activos), con una foto.
+### versionBaseActivo va en null porque el activo no venía en la descarga.
+### Reenviar este mismo cuerpo devuelve exactamente el mismo resultado y no crea nada.
+POST {{base}}/v1/sincronizacion/evaluaciones
+Content-Type: application/json
+X-Usuario: Ana Pérez
+X-Organizacion: Cruz Roja
+X-Dispositivo: {{dispositivo}}
+
+{
+  "idDispositivo": "{{dispositivo}}",
+  "instanteEnvioDispositivo": "2026-11-05T15:00:00Z",
+  "operaciones": [
+    {
+      "idOperacion": "0a000000-0000-0000-0000-000000000001",
+      "tipo": "CREAR",
+      "versionBaseActivo": null,
+      "evaluacion": {
+        "id": "{{evaluacion}}",
+        "activoId": "{{activo}}",
+        "activoNuevo": {
+          "id": "{{activo}}",
+          "tipoCodigo": "otra_infraestructura",
+          "lat": 4.686,
+          "lon": -74.056,
+          "referencia": "Muro de contención calle 80"
+        },
+        "desastreId": "{{desastre}}",
+        "instanteCampo": "2026-11-05T14:30:00Z",
+        "evaluador": "Ana Pérez",
+        "organizacion": "Cruz Roja",
+        "lat": 4.686,
+        "lon": -74.056,
+        "precisionM": 6,
+        "tipoActivoCodigo": "otra_infraestructura",
+        "nivelDano": "GRAVE",
+        "descripcion": "Muro de contención con grietas profundas",
+        "evidencias": [
+          {
+            "id": "{{evidencia}}",
+            "lat": 4.686,
+            "lon": -74.056,
+            "instanteCaptura": "2026-11-05T14:31:00Z",
+            "sha256": "9650f149d622055c4b495e65e9148ebfc5e61b1bb00e83538e76afe48c496eaf",
+            "tamanoBytes": 134
+          }
+        ]
+      }
+    }
+  ]
+}
+
+### Sincronización: ACTUALIZAR la evaluación anterior (mismo dispositivo, misma base → APLICADA aunque siga sin red)
+POST {{base}}/v1/sincronizacion/evaluaciones
+Content-Type: application/json
+X-Usuario: Ana Pérez
+X-Organizacion: Cruz Roja
+X-Dispositivo: {{dispositivo}}
+
+{
+  "idDispositivo": "{{dispositivo}}",
+  "instanteEnvioDispositivo": "2026-11-05T15:10:00Z",
+  "operaciones": [
+    {
+      "idOperacion": "0a000000-0000-0000-0000-000000000002",
+      "tipo": "ACTUALIZAR",
+      "versionBaseActivo": null,
+      "evaluacion": {
+        "id": "{{evaluacion}}",
+        "activoId": "{{activo}}",
+        "desastreId": "{{desastre}}",
+        "instanteCampo": "2026-11-05T15:05:00Z",
+        "evaluador": "Ana Pérez",
+        "organizacion": "Cruz Roja",
+        "lat": 4.686,
+        "lon": -74.056,
+        "precisionM": 5,
+        "tipoActivoCodigo": "otra_infraestructura",
+        "nivelDano": "DESTRUCCION_TOTAL",
+        "descripcion": "El muro colapsó",
+        "evidencias": []
+      }
+    }
+  ]
+}
+
+### Sincronización: otro dispositivo que descargó el activo en versión 1 → EN_CONFLICTO (la vigente queda intacta)
+POST {{base}}/v1/sincronizacion/evaluaciones
+Content-Type: application/json
+X-Usuario: Bruno Díaz
+X-Organizacion: Defensa Civil
+X-Dispositivo: celular-bruno
+
+{
+  "idDispositivo": "celular-bruno",
+  "instanteEnvioDispositivo": "2026-11-05T15:20:00Z",
+  "operaciones": [
+    {
+      "idOperacion": "0a000000-0000-0000-0000-000000000003",
+      "tipo": "CREAR",
+      "versionBaseActivo": 1,
+      "evaluacion": {
+        "id": "e0000000-0000-0000-0000-000000000002",
+        "activoId": "{{activo}}",
+        "desastreId": "{{desastre}}",
+        "instanteCampo": "2026-11-05T15:00:00Z",
+        "evaluador": "Bruno Díaz",
+        "organizacion": "Defensa Civil",
+        "lat": 4.686,
+        "lon": -74.056,
+        "precisionM": 8,
+        "tipoActivoCodigo": "otra_infraestructura",
+        "nivelDano": "LEVE",
+        "descripcion": "Solo fisuras superficiales",
+        "evidencias": []
+      }
+    }
+  ]
+}
+
+### Sincronización: activo nuevo creado sin conexión (versionBaseActivo nulo) + una operación INVALIDA
+POST {{base}}/v1/sincronizacion/evaluaciones
+Content-Type: application/json
+X-Usuario: Ana Pérez
+X-Organizacion: Cruz Roja
+X-Dispositivo: {{dispositivo}}
+
+{
+  "idDispositivo": "{{dispositivo}}",
+  "instanteEnvioDispositivo": "2026-11-05T15:30:00Z",
+  "operaciones": [
+    {
+      "idOperacion": "0a000000-0000-0000-0000-000000000004",
+      "tipo": "CREAR",
+      "versionBaseActivo": null,
+      "evaluacion": {
+        "id": "e0000000-0000-0000-0000-000000000003",
+        "activoId": "b0000000-0000-0000-0000-000000000001",
+        "activoNuevo": {
+          "id": "b0000000-0000-0000-0000-000000000001",
+          "tipoCodigo": "vivienda",
+          "lat": 4.7001,
+          "lon": -74.2001,
+          "referencia": "Casa esquinera sin nomenclatura"
+        },
+        "instanteCampo": "2026-11-05T15:25:00Z",
+        "evaluador": "Ana Pérez",
+        "organizacion": "Cruz Roja",
+        "lat": 4.7001,
+        "lon": -74.2001,
+        "precisionM": 4,
+        "tipoActivoCodigo": "vivienda",
+        "nivelDano": "MODERADO",
+        "descripcion": "Evaluación preliminar sin desastre asociado",
+        "evidencias": []
+      }
+    },
+    {
+      "idOperacion": "0a000000-0000-0000-0000-000000000005",
+      "tipo": "CREAR",
+      "versionBaseActivo": 1,
+      "evaluacion": {
+        "id": "e0000000-0000-0000-0000-000000000004",
+        "activoId": "{{activo}}",
+        "instanteCampo": "2026-11-05T15:25:00Z",
+        "evaluador": "Ana Pérez",
+        "organizacion": "Cruz Roja",
+        "lat": 4.686,
+        "lon": -74.056,
+        "precisionM": 4,
+        "tipoActivoCodigo": "vivienda",
+        "nivelDano": "CATASTROFICO",
+        "descripcion": "Nivel que no existe → INVALIDA"
+      }
+    }
+  ]
+}
+
+### Subir la foto declarada (multipart, parte "archivo"). Idempotente: repetirla responde 200 sin reescribir.
+PUT {{base}}/v1/evidencias/{{evidencia}}
+X-Usuario: Ana Pérez
+X-Organizacion: Cruz Roja
+X-Dispositivo: {{dispositivo}}
+Content-Type: multipart/form-data; boundary=limite
+
+--limite
+Content-Disposition: form-data; name="archivo"; filename="foto.jpg"
+Content-Type: image/jpeg
+
+< ./datos-ejemplo/foto.jpg
+--limite--
+
+### Conflictos pendientes con ambas versiones completas
+GET {{base}}/v1/conflictos?estado=PENDIENTE
+X-Usuario: Revisor
+X-Organizacion: UNGRD
+X-Dispositivo: consola
+
+### Evaluaciones de un dispositivo con su estado y número de versiones
+GET {{base}}/v1/evaluaciones?idDispositivo={{dispositivo}}
+X-Usuario: Revisor
+X-Organizacion: UNGRD
+X-Dispositivo: consola
+
+### Mapa de calor: puntos [lat, lon, peso] de la evaluación vigente de cada activo
+GET {{base}}/v1/mapa-calor?desastreId={{desastre}}&nivelMinimo=GRAVE
+X-Usuario: Revisor
+X-Organizacion: UNGRD
+X-Dispositivo: consola
+
+### Página del mapa de calor (abrir en el navegador)
+GET {{base}}/mapa?desastreId={{desastre}}
