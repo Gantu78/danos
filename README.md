@@ -39,8 +39,17 @@ En la pantalla **Ingreso**, la URL del API depende de dónde corre la app:
 | Emulador de Android Studio | `http://10.0.2.2:5080` (ya viene por defecto) |
 | Celular en la misma Wi-Fi que el PC | `http://<IP del PC>:5080`, por ejemplo `http://192.168.1.10:5080` |
 
-En Windows la IP del PC sale con `ipconfig` (Dirección IPv4). Si el celular no conecta, permite el puerto TCP 5080 en
-el Firewall de Windows.
+En Windows la IP del PC sale con `ipconfig` (Dirección IPv4). `10.0.2.2` **solo** funciona en el emulador: en un
+celular o tablet con esa URL la descarga falla y la app se queda sin tipos de activo ni desastres para elegir.
+
+Si el dispositivo no conecta, abre el puerto en el Firewall de Windows (PowerShell como administrador; solo admite
+equipos de la red local):
+
+```powershell
+New-NetFirewallRule -DisplayName "DanosCampo API 5080" -Direction Inbound -Protocol TCP -LocalPort 5080 -Action Allow -Profile Any -RemoteAddress LocalSubnet
+```
+
+Para comprobarlo, abre `http://<IP del PC>:5080/salud` en el navegador del celular: debe responder `{"estado":"ok",...}`.
 
 ## 3. Guion de prueba
 

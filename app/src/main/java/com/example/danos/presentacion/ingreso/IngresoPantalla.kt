@@ -7,7 +7,13 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,6 +30,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.danos.R
 import com.example.danos.presentacion.componentes.CampoTexto
+import com.example.danos.presentacion.componentes.ChipEstado
+import com.example.danos.presentacion.componentes.TonoChip
 import com.example.danos.presentacion.tema.DanosTheme
 
 @Composable
@@ -45,6 +53,7 @@ fun IngresoRuta(
         alCambiarOrganizacion = viewModel::alCambiarOrganizacion,
         alCambiarUrl = viewModel::alCambiarUrl,
         alGuardar = viewModel::guardar,
+        alProbarConexion = viewModel::probarConexion,
     )
 }
 
@@ -56,6 +65,7 @@ fun IngresoPantalla(
     alCambiarOrganizacion: (String) -> Unit,
     alCambiarUrl: (String) -> Unit,
     alGuardar: () -> Unit,
+    alProbarConexion: () -> Unit = {},
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.ingreso_titulo)) }) },
@@ -87,6 +97,27 @@ fun IngresoPantalla(
                 error = estado.errorUrl,
                 teclado = KeyboardType.Uri,
             )
+            Text(
+                text = stringResource(R.string.ayuda_url_api),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            OutlinedButton(
+                onClick = alProbarConexion,
+                enabled = !estado.probando,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Filled.NetworkCheck, contentDescription = null)
+                Text(stringResource(R.string.probar_conexion), Modifier.padding(start = 8.dp))
+            }
+            if (estado.probando) LinearProgressIndicator(Modifier.fillMaxWidth())
+            estado.pruebaConexion?.let { prueba ->
+                ChipEstado(
+                    texto = prueba.mensaje,
+                    tono = if (prueba.exitosa) TonoChip.EXITO else TonoChip.ERROR,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             Button(
                 onClick = alGuardar,
                 enabled = !estado.guardando,
@@ -102,6 +133,15 @@ fun IngresoPantalla(
 @Composable
 private fun IngresoPantallaPreview() {
     DanosTheme {
-        IngresoPantalla(IngresoEstado(urlApi = "http://10.0.2.2:5080"), {}, {}, {}, {})
+        IngresoPantalla(
+            estado = IngresoEstado(
+                urlApi = "http://192.168.1.10:5080",
+                pruebaConexion = PruebaConexion(exitosa = true, mensaje = "Conexión correcta con el servidor"),
+            ),
+            alCambiarEvaluador = {},
+            alCambiarOrganizacion = {},
+            alCambiarUrl = {},
+            alGuardar = {},
+        )
     }
 }

@@ -12,6 +12,8 @@
     <string name="campo_evaluador">Evaluador</string>
     <string name="campo_organizacion">Organización</string>
     <string name="campo_url_api">URL del API</string>
+    <string name="ayuda_url_api">En el emulador: http://10.0.2.2:5080. En un celular o tablet: http://IP-del-PC:5080, en la misma Wi-Fi.</string>
+    <string name="probar_conexion">Probar conexión</string>
 
     <string name="descarga_titulo">Descarga</string>
     <string name="elegir_desastre">Desastre</string>
