@@ -30,7 +30,7 @@ fun SelectorNivel(
                 FilterChip(
                     selected = nivel == seleccionado,
                     onClick = { alSeleccionar(nivel) },
-                    label = { Text(nivel.etiqueta) },
+                    label = { Text(nivel.etiquetaConEscala) },
                     enabled = habilitado,
                 )
             }

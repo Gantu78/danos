@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+**/.vs/
+**/TestResults/
+src/Danos.Api/evidencias/
+tests/

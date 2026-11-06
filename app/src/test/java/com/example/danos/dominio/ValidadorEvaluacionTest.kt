@@ -61,6 +61,12 @@ class ValidadorEvaluacionTest {
     }
 
     @Test
+    fun `los niveles siguen la escala 1 a 5 del enunciado`() {
+        assertEquals(listOf(1, 2, 3, 4, 5), NivelDano.entries.map { it.numero })
+        assertEquals("5 · Destrucción total", NivelDano.DESTRUCCION_TOTAL.etiquetaConEscala)
+    }
+
+    @Test
     fun `sin desastre el estado inicial es preliminar`() {
         assertEquals(EstadoEvaluacion.PRELIMINAR, estadoInicial(null))
         assertEquals(EstadoEvaluacion.REGISTRADA, estadoInicial("d1"))

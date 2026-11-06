@@ -37,7 +37,7 @@ fun EvaluacionCard(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "${resumen.tipoActivoNombre} · ${evaluacion.nivelDano?.etiqueta.orEmpty()}",
+                text = "${resumen.tipoActivoNombre} · ${evaluacion.nivelDano?.etiquetaConEscala.orEmpty()}",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(resumen.referenciaActivo, style = MaterialTheme.typography.bodyMedium)

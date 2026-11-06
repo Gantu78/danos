@@ -2,12 +2,16 @@ package com.example.danos.dominio
 
 import java.time.Instant
 
-enum class NivelDano(val etiqueta: String) {
-    SIN_DANO("Sin daño"),
-    LEVE("Leve"),
-    MODERADO("Moderado"),
-    GRAVE("Grave"),
-    DESTRUCCION_TOTAL("Destrucción total"),
+/** Nivel de afectación en la escala 1 (sin daño) a 5 (destrucción total). */
+enum class NivelDano(val numero: Int, val etiqueta: String) {
+    SIN_DANO(1, "Sin daño"),
+    LEVE(2, "Leve"),
+    MODERADO(3, "Moderado"),
+    GRAVE(4, "Grave"),
+    DESTRUCCION_TOTAL(5, "Destrucción total"),
+    ;
+
+    val etiquetaConEscala: String get() = "$numero · $etiqueta"
 }
 
 enum class EstadoEvaluacion(val etiqueta: String) {

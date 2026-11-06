@@ -1,0 +1,35 @@
+# Sistema central para probar DanosCampo: API .NET + PostgreSQL.
+#   docker compose up -d --build     → API en http://localhost:5080 (mapa en /mapa)
+#   docker compose down              → detiene; los datos quedan en los volúmenes
+#   docker compose down -v           → detiene y borra la base y las fotos
+# La contraseña es solo para esta base local de pruebas.
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_PASSWORD: danos_local
+      POSTGRES_DB: evaluacion_danos
+    volumes:
+      - datos:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d evaluacion_danos"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build: ./api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Danos: "Host=db;Port=5432;Database=evaluacion_danos;Username=postgres;Password=danos_local"
+    ports:
+      - "5080:5080"
+    volumes:
+      - evidencias:/app/evidencias
+    restart: unless-stopped
+
+volumes:
+  datos:
+  evidencias:
