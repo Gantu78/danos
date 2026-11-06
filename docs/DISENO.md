@@ -1,242 +1,357 @@
-# Diseño — Evaluación de daños en sitios de desastre
+# Documento de diseño — Evaluación de daños en sitios de desastre
 
-## 1. Problema y alcance
+Carlos Daniel Guiza, Juan Felipe Rubiano, Samuel Gantiva · Noviembre de 2026
 
-Los evaluadores de campo registran la **posición (latitud y longitud)** y el **nivel de afectación (1 a 5)** de los
-sitios afectados por un desastre. En terreno casi nunca hay internet, así que la app debe trabajar **desconectada** y
-**sincronizar** con el sistema central cuando vuelve la red, sin perder ni duplicar nada. El sistema central muestra un
-**mapa de calor** por desastre para ver qué regiones fueron más afectadas.
+Versión en PDF: [DISENO.pdf](DISENO.pdf). Fuente LaTeX: [latex/](latex/).
 
-| Requisito del enunciado | Cómo se cumple |
-| --- | --- |
-| Recolectar lat/lon | GPS del teléfono (Fused Location, alta precisión) con la precisión en metros; aviso si supera 50 m |
-| Nivel de afectación 1–5 | `1 · Sin daño`, `2 · Leve`, `3 · Moderado`, `4 · Grave`, `5 · Destrucción total`, con el criterio de cada nivel según el tipo de activo |
-| Funcionar sin internet | Réplica local completa en Room; guardar nunca usa la red |
-| Sincronizar al volver la red | WorkManager con restricción de red: envía la cola por lotes y sube las fotos |
-| Mapa de calor | Página `/mapa` del API con Leaflet + Leaflet.heat, filtrable por desastre y nivel mínimo |
+## 1. Descripción general
 
-Requisito de calidad que guía el diseño (**QA-14**): 120 evaluaciones con 5 conflictos → 0 pérdidas, 0 sobrescrituras
-silenciosas y 0 duplicados al reenviar.
+El sistema permite registrar la posición (latitud y longitud) y el nivel de afectación (de 1 a 5) de
+sitios afectados por un desastre. Tiene tres partes:
 
-## 2. Vista general
+- Una app Android que funciona sin internet y guarda todo en el teléfono.
+- Un sistema central (API en .NET con PostgreSQL) que recibe la información cuando vuelve la red.
+- Una página con un mapa de calor que muestra las zonas más afectadas de cada desastre.
+
+Lo más importante del diseño es que no se pierda ni se sobrescriba información al sincronizar, aunque
+varios evaluadores trabajen sin red sobre el mismo sitio. Para eso la app guarda una cola de operaciones y
+el servidor detecta los conflictos sin resolverlos.
+
+El diseño se describe con el modelo de vistas 4+1 de Kruchten, más un diagrama de contexto.
+
+## 2. Diagrama de contexto
+
+El evaluador usa la app en campo y la app toma la posición del GPS del teléfono. Cuando hay red, la app
+descarga el catálogo y sincroniza con el sistema central. El coordinador ve el mapa de calor desde un
+navegador; el mapa base sale de OpenStreetMap.
 
 ```mermaid
 flowchart LR
-    subgraph Campo["Teléfono del evaluador (sin red la mayor parte del tiempo)"]
-        App["App DanosCampo<br/>Kotlin · Compose · MVVM"]
-        Room[("Room<br/>réplica local + cola")]
-        App <--> Room
+    Evaluador(["Evaluador de campo"])
+    Coordinador(["Coordinador de emergencia"])
+    subgraph Sistema["Sistema de evaluación de daños"]
+        App["App móvil DanosCampo<br/>Android · offline-first"]
+        API["Sistema central<br/>API Evaluación de Daños"]
+        Mapa["Mapa de calor<br/>página web"]
     end
-    subgraph Central["Sistema central"]
-        API["API Evaluación de Daños<br/>ASP.NET Core .NET 10"]
-        PG[("PostgreSQL 18")]
-        Fotos[("Archivos de evidencias")]
-        Mapa["/mapa<br/>Leaflet.heat"]
-        API <--> PG
-        API --> Fotos
-        Mapa -->|"GET /v1/mapa-calor"| API
-    end
-    App -- "GET /v1/descarga<br/>POST /v1/sincronizacion/evaluaciones<br/>PUT /v1/evidencias/{id}<br/>(HTTP + JSON, cuando hay red)" --> API
-    Coordinador(["Coordinador"]) --> Mapa
+    OSM[("OpenStreetMap<br/>teselas del mapa")]
+    GPS[("GNSS del teléfono")]
+    Evaluador -- "registra posición, nivel 1-5 y fotos" --> App
+    GPS -- "lat, lon, precisión" --> App
+    App -- "descarga y sincroniza cuando hay red" --> API
+    Coordinador -- "consulta regiones afectadas" --> Mapa
+    Mapa -- "puntos por desastre" --> API
+    Mapa -- "teselas" --> OSM
 ```
 
-- **App móvil** (`app/`): cliente *offline-first*. Toda la lectura y escritura del evaluador va contra la base local.
-- **API** (`api/`): recibe lotes de operaciones, detecta conflictos y posibles duplicados **sin resolverlos** y sirve el
-  mapa de calor.
-- **Despliegue de pruebas**: `docker-compose.yml` levanta el API y PostgreSQL.
-
-## 3. App móvil
-
-### 3.1 Capas (MVVM sobre las 4 capas del diseño)
+## 3. Vista lógica
 
 ```mermaid
-flowchart TB
-    subgraph presentacion["presentacion — Compose + ViewModel"]
-        P1["Ingreso"] --- P2["Descarga"] --- P3["Mis evaluaciones"] --- P4["Evaluar"]
-    end
-    subgraph acceso["acceso — repositorios (única puerta a los datos)"]
-        R1["ConfiguracionRepositorio"] --- R2["CatalogoRepositorio"] --- R3["EvaluacionRepositorio"] --- R4["SincronizacionRepositorio"] --- R5["DispositivoRepositorio"]
-    end
-    subgraph dominio["dominio — Kotlin puro"]
-        D1["Evaluacion, Activo, Evidencia, NivelDano…"] --- D2["ValidadorEvaluacion"]
-    end
-    subgraph infraestructura["infraestructura"]
-        I1["local: Room"] --- I2["remoto: Retrofit"] --- I3["sync: WorkManager"] --- I4["dispositivo: GPS, cámara, red"] --- I5["preferencias: DataStore"]
-    end
-    presentacion --> acceso --> infraestructura
-    presentacion --> dominio
-    acceso --> dominio
+classDiagram
+    direction LR
+    class Evaluacion {
+        +UUID id
+        +Instant instanteCampo
+        +String evaluador
+        +String organizacion
+        +double lat
+        +double lon
+        +double precisionM
+        +NivelDano nivelDano
+        +String descripcion
+        +EstadoEvaluacion estadoEvaluacion
+        +EstadoSync estadoSync
+        +String motivoInvalida
+    }
+    class Activo {
+        +UUID id
+        +String referencia
+        +double lat
+        +double lon
+        +int version
+    }
+    class TipoActivo {
+        +String codigo
+        +String nombre
+    }
+    class CriterioNivel {
+        +NivelDano nivel
+        +String criterio
+    }
+    class Desastre {
+        +UUID id
+        +String nombre
+        +String tipo
+    }
+    class Evidencia {
+        +UUID id
+        +double lat
+        +double lon
+        +Instant instanteCaptura
+        +String sha256
+        +long tamanoBytes
+        +bool subida
+    }
+    class Operacion {
+        +UUID idOperacion
+        +TipoOperacion tipo
+        +int versionBaseActivo
+        +String payloadJson
+        +int intentos
+    }
+    class Conflicto {
+        +TipoConflicto tipo
+        +String regla
+        +EstadoConflicto estado
+    }
+    class NivelDano {
+        <<enumeration>>
+        1 SIN_DANO
+        2 LEVE
+        3 MODERADO
+        4 GRAVE
+        5 DESTRUCCION_TOTAL
+    }
+    class EstadoEvaluacion {
+        <<enumeration>>
+        PRELIMINAR
+        REGISTRADA
+        EN_CONFLICTO
+        VALIDADA
+        RECHAZADA
+    }
+    class EstadoSync {
+        <<enumeration>>
+        PENDIENTE
+        CONFIRMADA
+        INVALIDA
+    }
+    Activo "1" <-- "*" Evaluacion : evalúa
+    TipoActivo "1" <-- "*" Activo : clasifica
+    TipoActivo "1" *-- "5" CriterioNivel : define
+    Desastre "0..1" <-- "*" Evaluacion : agrupa
+    Evaluacion "1" *-- "*" Evidencia : tiene
+    Evaluacion "1" <-- "*" Operacion : cola de salida
+    Conflicto "*" --> "1" Activo : sobre
+    Conflicto "*" --> "1..2" Evaluacion : vigente y entrante
+    Evaluacion ..> NivelDano
+    Evaluacion ..> EstadoEvaluacion
+    Evaluacion ..> EstadoSync
 ```
 
-- Cada pantalla tiene un `XxxEstado` (data class) expuesto como `StateFlow` y efectos únicos (navegar, mensajes) por `Channel`.
-- Los ViewModel no conocen Room, Retrofit ni WorkManager; Hilt inyecta los repositorios.
-- La lista y los contadores son `Flow` desde Room: se actualizan solos cuando la sincronización cambia un estado.
+- **Evaluación**: lo que registra el evaluador sobre un activo (posición, precisión, nivel, descripción y
+  fotos). Su id es un UUID generado en el teléfono.
+- **Activo**: el sitio o bien evaluado (vivienda, escuela, puente, etc.). Tiene una versión que aumenta
+  cada vez que el servidor acepta una evaluación sobre él.
+- **TipoActivo** y **CriterioNivel**: catálogo que se descarga; cada tipo describe qué significa cada nivel
+  de 1 a 5.
+- **Desastre**: agrupa evaluaciones. Si una evaluación no tiene desastre queda como preliminar y no sale en
+  el mapa de calor.
+- **Evidencia**: foto con su ubicación, fecha y hash SHA-256.
+- **Operación**: elemento de la cola de envío (crear o actualizar) con una copia completa de la evaluación.
+- **Conflicto**: lo crea el servidor cuando una evaluación choca con otra.
 
-### 3.2 Pantallas
+Cada evaluación tiene dos estados. El estado de sincronización es solo local: `PENDIENTE` mientras no hay
+respuesta del servidor, `CONFIRMADA` cuando el servidor la recibió e `INVALIDA` si la rechazó. El estado de
+la evaluación lo decide el servidor: `PRELIMINAR`, `REGISTRADA`, `EN_CONFLICTO`, `VALIDADA` o `RECHAZADA`.
 
-| Pantalla | Qué hace |
-| --- | --- |
-| Ingreso | Evaluador, organización y URL del API; genera una sola vez el `idDispositivo` (UUID) |
-| Descarga | Baja tipos de activo con sus criterios, desastres y activos registrados. Si falla, conserva lo anterior |
-| Mis evaluaciones | Tarjetas con tipo, nivel, activo, fecha, estado de la evaluación y de sincronización y fotos pendientes; indicador de red, contador de pendientes y botón Sincronizar |
-| Evaluar | Activo descargado o nuevo, GPS, tipo, nivel 1–5 con su criterio, desastre opcional, descripción y fotos |
+**Reglas**
 
-### 3.3 Modelo de datos local (Room)
+- Una operación solo se borra de la cola cuando el servidor respondió por ella.
+- Una operación que ya se intentó enviar no se modifica. Si el usuario edita después, se crea una operación
+  nueva.
+- La app nunca resuelve conflictos, solo muestra lo que dice el servidor.
 
-```mermaid
-erDiagram
-    tipo_activo ||--o{ criterio_nivel : "tiene"
-    activo ||--o{ evaluacion : "se evalúa en"
-    evaluacion ||--o{ evidencia : "tiene fotos"
-    evaluacion ||--o{ operacion : "pendiente de enviar"
-    desastre |o--o{ evaluacion : "opcional"
-    evaluacion {
-        uuid id PK
-        uuid activoId
-        uuid desastreId "null = PRELIMINAR"
-        double lat
-        double lon
-        double precisionM
-        text nivelDano "1..5"
-        text estadoEvaluacion "PRELIMINAR REGISTRADA EN_CONFLICTO VALIDADA RECHAZADA"
-        text estadoSync "PENDIENTE CONFIRMADA INVALIDA"
-    }
-    operacion {
-        uuid idOperacion PK
-        text tipo "CREAR ACTUALIZAR"
-        int versionBaseActivo
-        text payloadJson "instantánea completa"
-        int intentos
-        text ultimoError
-    }
-    activo {
-        uuid id PK
-        int versionDescargada "null = creado en campo"
-    }
-    evidencia {
-        uuid id PK
-        text sha256
-        long tamanoBytes
-        bool subida
-    }
-```
+**Conflicto.** Cada operación lleva la versión del activo que tenía el teléfono. Hay conflicto si el activo
+tiene una versión mayor hecha por otro dispositivo; las versiones del mismo dispositivo no cuentan. Cuando
+hay conflicto el servidor guarda las dos versiones y no cambia la vigente.
 
-La tabla `operacion` es la **cola de salida**. Cada operación guarda la instantánea completa de la evaluación
-(`payloadJson`) en el momento de encolarla.
+**Duplicados.** Un activo nuevo se marca como posible duplicado si hay otra evaluación a menos de 25 m
+(distancia de Haversine) en un rango de 24 horas.
 
-### 3.4 Invariantes de la cola
+**Mapa de calor.** Se toma un punto por activo con el nivel de su evaluación vigente. El peso es 0, 0,25,
+0,5, 0,75 y 1 para los niveles 1 a 5.
 
-1. Una operación **solo sale de la cola** cuando el servidor respondió por ella.
-2. Una operación ya intentada (`intentos > 0`) es **inmutable**. Editar antes del primer envío reemplaza su payload;
-   editar después crea una operación `ACTUALIZAR` nueva.
-3. La app **nunca resuelve conflictos**: refleja lo que decide el servidor.
-4. Ni la sincronización ni la descarga borran evaluaciones o fotos. La descarga tampoco toca activos creados en campo,
-   activos con operaciones pendientes ni activos que use una evaluación local.
-
-Guardar (evaluación + fotos + activo nuevo + operación) es una sola transacción de Room.
-
-### 3.5 Sincronización
+## 4. Vista de procesos
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant UI as App (Evaluar)
-    participant DB as Room
-    participant WM as WorkManager
-    participant API as API .NET
-    UI->>DB: guardar evaluación + operación CREAR (una transacción)
-    UI->>WM: encolar "sincronizacion" (requiere red, backoff exponencial 30 s)
-    Note over WM: espera hasta que haya red
-    loop hasta vaciar la cola
-        WM->>DB: tomar ≤ 20 operaciones e incrementar intentos (una transacción)
-        WM->>API: POST /v1/sincronizacion/evaluaciones
+    actor E as Evaluador
+    participant App as App (UI + ViewModel)
+    participant DB as Room (réplica + cola)
+    participant W as SincronizacionWorker
+    participant API as API Evaluación de Daños
+    participant PG as PostgreSQL
+    E->>App: registra posición, nivel 1-5, descripción y fotos
+    App->>DB: guarda evaluación + evidencias + operación CREAR (una transacción)
+    App->>W: encola trabajo único con restricción CONNECTED
+    Note over E,DB: sin red todo termina aquí: la evaluación queda PENDIENTE
+    Note over W: al volver la red, WorkManager ejecuta el trabajo
+    loop mientras haya operaciones y avance
+        W->>DB: toma ≤ 20 operaciones e incrementa intentos
+        W->>API: POST /v1/sincronizacion/evaluaciones
+        loop cada operación (transacción propia)
+            API->>PG: ¿idOperacion ya procesada? → devuelve el mismo resultado
+            API->>API: valida · regla de conflicto · posibles duplicados
+            API->>PG: guarda evaluación o versión en conflicto + resultado
+        end
         alt 2xx
-            API-->>WM: un resultado por operación
-            WM->>DB: aplicar cada resultado en su transacción
+            API-->>W: APLICADA · EN_CONFLICTO · POSIBLE_DUPLICADO · INVALIDA
+            W->>DB: aplica cada resultado y retira la operación
         else sin red o 5xx
-            WM-->>WM: Result.retry() — el servidor es idempotente por idOperacion
+            W-->>W: reintento con espera exponencial (30 s)
         else 4xx
-            WM->>DB: guardar ultimoError, no reintentar en bucle
+            W->>DB: guarda ultimoError y se detiene
         end
     end
-    WM->>API: PUT /v1/evidencias/{id} por cada foto de evaluaciones CONFIRMADAS
+    W->>API: PUT /v1/evidencias/{id} (fotos de evaluaciones confirmadas)
+    API-->>W: 2xx subida · 422 hash distinto
+    App-->>E: la tarjeta pasa a Confirmada (o En conflicto)
 ```
 
-| Resultado del servidor | Efecto en la app |
+1. Al guardar, la app escribe en una sola transacción la evaluación, las fotos y una operación en la cola,
+   y programa un trabajo de WorkManager que solo se ejecuta cuando hay red. Sin red el proceso termina ahí
+   y la evaluación queda pendiente.
+2. Cuando vuelve la red, el trabajo toma hasta 20 operaciones y las envía en un lote.
+3. El servidor procesa cada operación en su propia transacción. Si ya había recibido esa operación (mismo
+   `idOperacion`) devuelve la misma respuesta, así que reenviar no duplica nada.
+4. La app aplica cada resultado: `APLICADA` confirma la evaluación, `EN_CONFLICTO` y `POSIBLE_DUPLICADO`
+   la confirman pero la marcan en conflicto, e `INVALIDA` muestra el motivo para que el usuario la corrija.
+5. Al final se suben las fotos de las evaluaciones confirmadas.
+
+Si no hay red o el servidor responde con error 5xx, el trabajo se reintenta más tarde con espera
+exponencial. Si responde con error 4xx, se guarda el error y no se reintenta en bucle.
+
+## 5. Vista de desarrollo
+
+El repositorio tiene dos proyectos: la app y el API. Los dos están organizados por capas y solo se
+comunican por el contrato REST.
+
+```mermaid
+flowchart LR
+    subgraph Repo["Repositorio danos"]
+        direction LR
+        subgraph APP["app/ · Android (Kotlin)"]
+            direction TB
+            P["presentacion<br/>Compose · ViewModel · navegación"]
+            A["acceso<br/>repositorios"]
+            I["infraestructura<br/>local (Room) · remoto (Retrofit) · sync (WorkManager)<br/>dispositivo · preferencias · di (Hilt)"]
+            D["dominio<br/>modelos · NivelDano · ValidadorEvaluacion"]
+            P --> A --> I
+            P -.-> D
+            A -.-> D
+            I -.-> D
+        end
+        subgraph SRV["api/ · ASP.NET Core (.NET 10)"]
+            direction TB
+            AC["Acceso<br/>controladores · DTO · FiltroEncabezados · /mapa"]
+            DO["Dominio<br/>servicios · ReglaConflicto · DetectorDuplicados · validador"]
+            IN["Infraestructura<br/>EF Core · migraciones · semilla · archivos"]
+            AC --> DO --> IN
+        end
+        DOCS["docs/ · diseño"]
+        DC["docker-compose.yml"]
+    end
+    APP -- "contrato REST JSON" --> SRV
+    DC -. "construye" .-> SRV
+```
+
+**App (Kotlin).** `presentacion` tiene las pantallas en Jetpack Compose y los ViewModel; `acceso` tiene los
+repositorios, que son la única forma de llegar a los datos; `dominio` tiene los modelos y validaciones sin
+dependencias de Android; `infraestructura` tiene Room, Retrofit, WorkManager, GPS y cámara. Las
+dependencias se inyectan con Hilt.
+
+**API (.NET 10).** `Acceso` tiene los controladores y la página del mapa; `Dominio` tiene los servicios y
+las reglas de conflicto y duplicados; `Infraestructura` tiene Entity Framework Core y el almacenamiento de
+fotos.
+
+| Endpoint | Uso |
 | --- | --- |
-| `APLICADA` | Sale de la cola; `CONFIRMADA`; estado que dice el servidor; nueva versión del activo |
-| `EN_CONFLICTO` / `POSIBLE_DUPLICADO` | Sale de la cola; `CONFIRMADA`; evaluación `EN_CONFLICTO` para revisión humana |
-| `INVALIDA` | Sale de la cola; `INVALIDA` con el motivo visible. Al corregirla se encola de nuevo |
-| Sin resultado | Se queda en la cola y se reintenta más tarde |
-
-Si la evaluación se editó mientras viajaba la operación anterior, sigue en `PENDIENTE` hasta que responda la nueva.
-
-### 3.6 Fotos de evidencia
-
-Cámara del sistema (`TakePicture`) hacia `filesDir/evidencias/{uuid}.jpg` vía FileProvider. Al volver: corrige la
-orientación EXIF, escala a 1600 px de lado mayor, JPEG calidad 80, y calcula SHA-256 y tamaño del archivo final. El
-servidor verifica el hash al recibir la foto.
-
-## 4. Sistema central (API)
-
-### 4.1 Contrato REST
-
-Encabezados obligatorios en `/v1/*`: `X-Usuario`, `X-Organizacion`, `X-Dispositivo`, en UTF-8 para admitir tildes.
-
-| Método y ruta | Uso |
-| --- | --- |
-| `GET /v1/descarga?desastreId=` | Catálogo, desastres y activos con su versión |
-| `POST /v1/sincronizacion/evaluaciones` | Lote de operaciones → un resultado por operación, en orden |
-| `PUT /v1/evidencias/{id}` | Foto (multipart `archivo`); 422 si el hash no coincide |
-| `GET /v1/mapa-calor?desastreId=&nivelMinimo=` | Puntos del mapa de calor |
-| `GET /v1/conflictos`, `GET /v1/evaluaciones` | Revisión |
+| `GET /v1/descarga` | Catálogo, desastres y activos |
+| `POST /v1/sincronizacion/evaluaciones` | Recibe un lote de operaciones |
+| `PUT /v1/evidencias/{id}` | Recibe una foto |
+| `GET /v1/mapa-calor` | Puntos del mapa de calor |
 | `GET /mapa` | Página del mapa de calor |
 
-### 4.2 Reglas de negocio
+## 6. Vista física
 
-- **Idempotencia**: cada operación procesada se guarda con su resultado (`operacion_procesada`); reenviarla devuelve
-  exactamente lo mismo sin crear nada.
-- **Conflicto de versión**: hay conflicto si el activo tiene una versión posterior a la base que traía la operación y
-  la produjo **otro** dispositivo. Las versiones del mismo dispositivo no cuentan, así que crear y editar sin red no
-  choca consigo mismo. En conflicto no se toca la evaluación vigente: se guardan ambas versiones.
-- **Posible duplicado**: un activo nuevo a ≤ 25 m (Haversine) y ±24 h de otra evaluación; se marca para revisión.
-- **Una transacción por operación**: el error de una no tumba las demás. Si una falla de forma inesperada, el lote
-  responde 503 y la app lo reenvía.
+```mermaid
+flowchart LR
+    subgraph Tel["Celular o tablet · Android 8+"]
+        APK["DanosCampo.apk"]
+        SQLite[("SQLite<br/>réplica + cola")]
+        Fotos[("filesDir/evidencias")]
+        APK --- SQLite
+        APK --- Fotos
+    end
+    subgraph Srv["PC o servidor · Docker Compose"]
+        subgraph CA["contenedor api"]
+            Kestrel["ASP.NET Core<br/>Kestrel :5080"]
+            VolE[("volumen evidencias")]
+        end
+        subgraph CB["contenedor db"]
+            PG[("PostgreSQL 18<br/>volumen datos")]
+        end
+        Kestrel -- "TCP 5432" --> PG
+        Kestrel --- VolE
+    end
+    Nav["Navegador del coordinador"]
+    APK -- "HTTP :5080 · Wi-Fi o datos<br/>(10.0.2.2 desde el emulador)" --> Kestrel
+    Nav -- "HTTP :5080/mapa" --> Kestrel
+```
 
-### 4.3 Mapa de calor
+La app corre en el celular o tablet y guarda sus datos en SQLite. El sistema central corre con Docker
+Compose en dos contenedores: uno con el API (puerto 5080) y otro con PostgreSQL. El coordinador abre el
+mapa desde el navegador. Desde el emulador de Android el servidor se ve en `10.0.2.2:5080`; desde un
+celular se usa la IP del PC en la misma red Wi-Fi.
 
-Un punto por activo con el nivel de su evaluación vigente en el desastre elegido. El peso crece con el nivel: 1 → 0,
-2 → 0,25, 3 → 0,5, 4 → 0,75, 5 → 1. La página usa Leaflet 1.9.4 + Leaflet.heat sobre OpenStreetMap, muestra el
-conteo por nivel y los conflictos pendientes, y se refresca cada 10 s. Solo aparecen las evaluaciones asociadas a un
-desastre: las preliminares (sin desastre) no se pintan.
+## 7. Escenarios
 
-## 5. Decisiones principales
+```mermaid
+flowchart LR
+    Ev(["Evaluador"])
+    Co(["Coordinador"])
+    subgraph Sistema["Sistema de evaluación de daños"]
+        direction TB
+        CU1(["CU-01 Configurar y probar conexión"])
+        CU2(["CU-02 Descargar catálogo y activos"])
+        CU3(["CU-03 Registrar evaluación sin red"])
+        CU4(["CU-04 Sincronizar al volver la red"])
+        CU5(["CU-05 Editar evaluación propia"])
+        CU6(["CU-06 Detectar conflicto o duplicado"])
+        CU7(["CU-07 Consultar mapa de calor"])
+    end
+    Ev --- CU1
+    Ev --- CU2
+    Ev --- CU3
+    Ev --- CU5
+    CU3 -. "include" .-> CU4
+    CU5 -. "include" .-> CU4
+    CU6 -. "extend" .-> CU4
+    Co --- CU7
+```
 
-| Decisión | Motivo |
-| --- | --- |
-| Cola de operaciones inmutables con instantánea completa | Reenviar es seguro; nada se pierde si se cae la red a mitad de un envío |
-| UUID generados en el teléfono | Crear sin red sin colisiones; el servidor deduplica por `idOperacion` |
-| El servidor detecta conflictos; la app no los resuelve | Ninguna edición sobrescribe en silencio la de otro evaluador (QA-14) |
-| Corregir una `INVALIDA` que el servidor nunca registró reenvía `CREAR` | El servidor rechaza `ACTUALIZAR` sobre una evaluación que no existe |
-| Validaciones de longitud iguales a las del servidor | El error se ve en el formulario y no vuelve como `INVALIDA` |
-| Fotos aparte del lote, después de confirmar | El lote es liviano; la subida es idempotente y verificada por hash |
-| HTTP sin TLS solo en debug | Simplificación para pruebas en red local |
+- **CU-01 Configurar**: el evaluador escribe su nombre, organización y la URL del servidor, y puede probar
+  la conexión.
+- **CU-02 Descargar**: con red, descarga tipos de activo, desastres y activos.
+- **CU-03 Registrar sin red**: elige o crea el activo, la app toma el GPS, elige el nivel de 1 a 5, el
+  desastre, una descripción y fotos, y guarda.
+- **CU-04 Sincronizar**: al volver la red las evaluaciones se envían solas.
+- **CU-05 Editar**: modifica una evaluación propia y se vuelve a sincronizar.
+- **CU-06 Detectar conflicto**: el servidor detecta conflictos o duplicados y guarda ambas versiones.
+- **CU-07 Ver mapa de calor**: el coordinador elige un desastre y ve las zonas más afectadas.
 
-## 6. Tecnologías
+El escenario CU-03 + CU-04 recorre todas las vistas: usa las clases Evaluación y Operación (lógica), el
+trabajo de WorkManager y el servidor (procesos), las capas de la app y del API (desarrollo) y los dos nodos
+(física).
 
-| Componente | Tecnología |
-| --- | --- |
-| App | Kotlin, Jetpack Compose (Material 3), MVVM, Hilt, Room, WorkManager, Retrofit + kotlinx.serialization, OkHttp, DataStore, Fused Location, Coil; minSdk 26 |
-| API | ASP.NET Core .NET 10, EF Core 10 + Npgsql, Razor Pages |
-| Base central | PostgreSQL 18 |
-| Mapa | Leaflet 1.9.4 + Leaflet.heat 0.2.0, OpenStreetMap |
-| Despliegue de pruebas | Docker Compose |
+## 8. Decisiones de diseño
 
-## 7. Pruebas
-
-| Nivel | Qué cubre |
-| --- | --- |
-| Unitarias app (JUnit + coroutines-test) | Validador, reglas de la cola, los 4 resultados y "sin resultado", errores de red/5xx/4xx, serialización del contrato, encabezados con tildes y un escenario QA-14 (120 evaluaciones, 5 conflictos, una respuesta perdida) |
-| Instrumentadas app (Room en memoria) | Guardado atómico, operaciones sin respuesta que no se borran, descarga que no borra datos de campo |
-| Contrato app ↔ API real | Descarga, activo nuevo con foto, edición, conflicto entre dos dispositivos e `INVALIDA` corregida |
-| API (xUnit + WebApplicationFactory) | Regla de conflicto, duplicados, sincronización, evidencias y mapa (`dotnet test` en `api/`) |
+- Se guarda una copia completa de los datos en el teléfono para poder trabajar sin internet.
+- Los ids se generan en el teléfono (UUID) para poder crear registros sin red.
+- El servidor detecta los conflictos y no los resuelve, para no perder la versión de nadie.
+- El conflicto se decide por la versión del activo y no por la hora del teléfono, porque los relojes de los
+  celulares pueden estar mal.
+- Las fotos se suben aparte del lote para que el envío sea liviano.
+- El sistema central se despliega con Docker Compose para levantarlo con un solo comando.
