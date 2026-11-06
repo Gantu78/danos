@@ -1,0 +1,56 @@
+<resources>
+    <string name="app_name">danos</string>
+
+    <string name="guardar">Guardar</string>
+    <string name="volver">Volver</string>
+    <string name="con_conexion">Con conexión</string>
+    <string name="sin_conexion">Sin conexión</string>
+    <string name="foto_evidencia">Foto de evidencia</string>
+    <string name="borrar_foto">Borrar foto</string>
+
+    <string name="ingreso_titulo">Ingreso</string>
+    <string name="campo_evaluador">Evaluador</string>
+    <string name="campo_organizacion">Organización</string>
+    <string name="campo_url_api">URL del API</string>
+
+    <string name="descarga_titulo">Descarga</string>
+    <string name="elegir_desastre">Desastre</string>
+    <string name="sin_desastre">Sin desastre</string>
+    <string name="descargar">Descargar</string>
+    <string name="ultima_descarga">Última descarga: %1$s</string>
+    <string name="nunca">nunca</string>
+    <string name="numero_activos">Activos: %1$d</string>
+    <string name="numero_tipos">Tipos de activo: %1$d</string>
+
+    <string name="lista_titulo">Mis evaluaciones</string>
+    <string name="lista_vacia">Aún no hay evaluaciones</string>
+    <string name="sincronizar">Sincronizar</string>
+    <string name="sincronizacion_solicitada">Sincronización solicitada</string>
+    <string name="nueva_evaluacion">Nueva evaluación</string>
+    <string name="editar_evaluacion">Editar evaluación</string>
+    <plurals name="fotos_pendientes">
+        <item quantity="one">%1$d foto pendiente</item>
+        <item quantity="other">%1$d fotos pendientes</item>
+    </plurals>
+
+    <string name="solo_lectura">Esta evaluación es de otro evaluador: solo puedes consultarla.</string>
+    <string name="sin_catalogo">Aún no hay catálogo. Usa Descarga cuando tengas red.</string>
+    <string name="campo_activo">Activo</string>
+    <string name="activo_descargado">Descargado</string>
+    <string name="activo_nuevo">Activo nuevo</string>
+    <string name="campo_referencia">Referencia del activo</string>
+    <string name="buscar_activo">Buscar por referencia o tipo</string>
+    <string name="activo_elegido">Elegido: %1$s</string>
+    <string name="campo_ubicacion">Ubicación</string>
+    <string name="sin_ubicacion">Sin ubicación todavía</string>
+    <string name="aviso_precision">Precisión baja: más de 50 m. Conviene reintentar.</string>
+    <string name="reintentar_ubicacion">Reintentar ubicación</string>
+    <string name="campo_tipo_activo">Tipo de activo</string>
+    <string name="elegir_tipo">Elegir tipo</string>
+    <string name="campo_nivel">Nivel de daño</string>
+    <string name="campo_desastre">Desastre (opcional)</string>
+    <string name="sin_desastre_preliminar">Sin desastre (preliminar)</string>
+    <string name="campo_descripcion">Descripción</string>
+    <string name="campo_fotos">Fotos</string>
+    <string name="tomar_foto">Tomar foto</string>
+</resources>

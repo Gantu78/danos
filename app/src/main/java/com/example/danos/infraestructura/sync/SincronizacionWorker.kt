@@ -1,0 +1,21 @@
+package com.example.danos.infraestructura.sync
+
+import android.content.Context
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+
+@HiltWorker
+class SincronizacionWorker @AssistedInject constructor(
+    @Assisted contexto: Context,
+    @Assisted parametros: WorkerParameters,
+    private val motor: MotorSincronizacion,
+) : CoroutineWorker(contexto, parametros) {
+
+    override suspend fun doWork(): Result = when (motor.ejecutarCiclo()) {
+        DesenlaceCiclo.TERMINADO -> Result.success()
+        DesenlaceCiclo.REINTENTAR -> Result.retry()
+    }
+}

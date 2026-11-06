@@ -1,0 +1,445 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "e9c109105050b88e19e360b105888a4e",
+    "entities": [
+      {
+        "tableName": "tipo_activo",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`codigo` TEXT NOT NULL, `nombre` TEXT NOT NULL, PRIMARY KEY(`codigo`))",
+        "fields": [
+          {
+            "fieldPath": "codigo",
+            "columnName": "codigo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "codigo"
+          ]
+        }
+      },
+      {
+        "tableName": "criterio_nivel",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tipoCodigo` TEXT NOT NULL, `nivel` TEXT NOT NULL, `criterio` TEXT NOT NULL, PRIMARY KEY(`tipoCodigo`, `nivel`))",
+        "fields": [
+          {
+            "fieldPath": "tipoCodigo",
+            "columnName": "tipoCodigo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nivel",
+            "columnName": "nivel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "criterio",
+            "columnName": "criterio",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tipoCodigo",
+            "nivel"
+          ]
+        }
+      },
+      {
+        "tableName": "desastre",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `nombre` TEXT NOT NULL, `tipo` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nombre",
+            "columnName": "nombre",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipo",
+            "columnName": "tipo",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "activo",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `tipoCodigo` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `referencia` TEXT NOT NULL, `versionDescargada` INTEGER, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipoCodigo",
+            "columnName": "tipoCodigo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "referencia",
+            "columnName": "referencia",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionDescargada",
+            "columnName": "versionDescargada",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "evaluacion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `activoId` TEXT NOT NULL, `desastreId` TEXT, `instanteCampo` INTEGER NOT NULL, `evaluador` TEXT NOT NULL, `organizacion` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `precisionM` REAL NOT NULL, `tipoActivoCodigo` TEXT NOT NULL, `nivelDano` TEXT NOT NULL, `descripcion` TEXT NOT NULL, `estadoEvaluacion` TEXT NOT NULL, `estadoSync` TEXT NOT NULL, `motivoInvalida` TEXT, `conocidaPorServidor` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activoId",
+            "columnName": "activoId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "desastreId",
+            "columnName": "desastreId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "instanteCampo",
+            "columnName": "instanteCampo",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluador",
+            "columnName": "evaluador",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "organizacion",
+            "columnName": "organizacion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "precisionM",
+            "columnName": "precisionM",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipoActivoCodigo",
+            "columnName": "tipoActivoCodigo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nivelDano",
+            "columnName": "nivelDano",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "descripcion",
+            "columnName": "descripcion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoEvaluacion",
+            "columnName": "estadoEvaluacion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "estadoSync",
+            "columnName": "estadoSync",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "motivoInvalida",
+            "columnName": "motivoInvalida",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "conocidaPorServidor",
+            "columnName": "conocidaPorServidor",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_evaluacion_activoId",
+            "unique": false,
+            "columnNames": [
+              "activoId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evaluacion_activoId` ON `${TABLE_NAME}` (`activoId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "evidencia",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `evaluacionId` TEXT NOT NULL, `rutaArchivo` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `instanteCaptura` INTEGER NOT NULL, `sha256` TEXT NOT NULL, `tamanoBytes` INTEGER NOT NULL, `subida` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`evaluacionId`) REFERENCES `evaluacion`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluacionId",
+            "columnName": "evaluacionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rutaArchivo",
+            "columnName": "rutaArchivo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lat",
+            "columnName": "lat",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lon",
+            "columnName": "lon",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "instanteCaptura",
+            "columnName": "instanteCaptura",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sha256",
+            "columnName": "sha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tamanoBytes",
+            "columnName": "tamanoBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "subida",
+            "columnName": "subida",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_evidencia_evaluacionId",
+            "unique": false,
+            "columnNames": [
+              "evaluacionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_evidencia_evaluacionId` ON `${TABLE_NAME}` (`evaluacionId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "evaluacion",
+            "onDelete": "NO ACTION",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "evaluacionId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "operacion",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`idOperacion` TEXT NOT NULL, `tipo` TEXT NOT NULL, `evaluacionId` TEXT NOT NULL, `activoId` TEXT NOT NULL, `versionBaseActivo` INTEGER, `payloadJson` TEXT NOT NULL, `creada` INTEGER NOT NULL, `intentos` INTEGER NOT NULL, `ultimoError` TEXT, PRIMARY KEY(`idOperacion`))",
+        "fields": [
+          {
+            "fieldPath": "idOperacion",
+            "columnName": "idOperacion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "tipo",
+            "columnName": "tipo",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evaluacionId",
+            "columnName": "evaluacionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activoId",
+            "columnName": "activoId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionBaseActivo",
+            "columnName": "versionBaseActivo",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "payloadJson",
+            "columnName": "payloadJson",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "creada",
+            "columnName": "creada",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "intentos",
+            "columnName": "intentos",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ultimoError",
+            "columnName": "ultimoError",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "idOperacion"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_operacion_evaluacionId",
+            "unique": false,
+            "columnNames": [
+              "evaluacionId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operacion_evaluacionId` ON `${TABLE_NAME}` (`evaluacionId`)"
+          },
+          {
+            "name": "index_operacion_activoId",
+            "unique": false,
+            "columnNames": [
+              "activoId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operacion_activoId` ON `${TABLE_NAME}` (`activoId`)"
+          },
+          {
+            "name": "index_operacion_creada",
+            "unique": false,
+            "columnNames": [
+              "creada"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_operacion_creada` ON `${TABLE_NAME}` (`creada`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'e9c109105050b88e19e360b105888a4e')"
+    ]
+  }
+}
