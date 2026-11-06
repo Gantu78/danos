@@ -15,6 +15,7 @@ import com.example.danos.dominio.ErrorCampo
 import com.example.danos.dominio.Evaluacion
 import com.example.danos.dominio.Evidencia
 import com.example.danos.dominio.FotoEnCurso
+import com.example.danos.dominio.Limites
 import com.example.danos.dominio.NivelDano
 import com.example.danos.dominio.Resultado
 import com.example.danos.dominio.ResultadoUbicacion
@@ -256,6 +257,7 @@ class EvaluarViewModel @Inject constructor(
         val formulario = estadoActual.formulario
         val referencia = formulario.referenciaNueva.trim()
         val faltaReferencia = evaluacionId == null && formulario.activoNuevo && referencia.isEmpty()
+        val referenciaLarga = evaluacionId == null && formulario.activoNuevo && referencia.length > Limites.REFERENCIA
         val tipoCodigo = formulario.tipoCodigo.orEmpty()
         val ubicacion = formulario.ubicacion
 
@@ -273,12 +275,16 @@ class EvaluarViewModel @Inject constructor(
                 if (ubicacion == null) add(ErrorCampo(CampoEvaluacion.UBICACION, "Falta la ubicación"))
             }.filterNot { formulario.activoNuevo && it.campo == CampoEvaluacion.ACTIVO }
 
-            if (errores.isNotEmpty() || faltaReferencia) {
+            if (errores.isNotEmpty() || faltaReferencia || referenciaLarga) {
                 _estado.update {
                     it.copy(
                         guardando = false,
                         errores = errores.associate { error -> error.campo to error.mensaje },
-                        errorReferencia = "La referencia es obligatoria".takeIf { faltaReferencia },
+                        errorReferencia = when {
+                            faltaReferencia -> "La referencia es obligatoria"
+                            referenciaLarga -> "Máximo ${Limites.REFERENCIA} caracteres"
+                            else -> null
+                        },
                     )
                 }
                 return@launch

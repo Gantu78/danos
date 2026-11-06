@@ -54,6 +54,13 @@ class ValidadorEvaluacionTest {
     }
 
     @Test
+    fun `respeta las longitudes maximas del servidor`() {
+        assertTrue(campos(evaluacionDePrueba(descripcion = "x".repeat(Limites.DESCRIPCION))).isEmpty())
+        assertTrue(CampoEvaluacion.DESCRIPCION in campos(evaluacionDePrueba(descripcion = "x".repeat(Limites.DESCRIPCION + 1))))
+        assertTrue(CampoEvaluacion.EVALUADOR in campos(evaluacionDePrueba().copy(evaluador = "a".repeat(Limites.NOMBRE + 1))))
+    }
+
+    @Test
     fun `sin desastre el estado inicial es preliminar`() {
         assertEquals(EstadoEvaluacion.PRELIMINAR, estadoInicial(null))
         assertEquals(EstadoEvaluacion.REGISTRADA, estadoInicial("d1"))

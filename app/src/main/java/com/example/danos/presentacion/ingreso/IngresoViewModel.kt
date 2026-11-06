@@ -3,6 +3,7 @@ package com.example.danos.presentacion.ingreso
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.danos.acceso.ConfiguracionRepositorio
+import com.example.danos.dominio.Limites
 import com.example.danos.dominio.ValidadorIngreso
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -46,11 +47,17 @@ class IngresoViewModel @Inject constructor(
 
     fun alCambiarUrl(valor: String) = _estado.update { it.copy(urlApi = valor, errorUrl = null) }
 
+    private fun errorNombre(valor: String, siVacio: String): String? = when {
+        valor.isBlank() -> siVacio
+        valor.trim().length > Limites.NOMBRE -> "Máximo ${Limites.NOMBRE} caracteres"
+        else -> null
+    }
+
     fun guardar() {
         val actual = _estado.value
         val conErrores = actual.copy(
-            errorEvaluador = "El evaluador es obligatorio".takeIf { actual.evaluador.isBlank() },
-            errorOrganizacion = "La organización es obligatoria".takeIf { actual.organizacion.isBlank() },
+            errorEvaluador = errorNombre(actual.evaluador, "El evaluador es obligatorio"),
+            errorOrganizacion = errorNombre(actual.organizacion, "La organización es obligatoria"),
             errorUrl = "Escribe una URL válida, por ejemplo http://10.0.2.2:5080"
                 .takeUnless { ValidadorIngreso.urlValida(actual.urlApi) },
         )

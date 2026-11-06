@@ -17,6 +17,12 @@ object ValidadorEvaluacion {
         exigir(evaluacion.organizacion, CampoEvaluacion.ORGANIZACION, "Falta la organización")
         exigir(evaluacion.tipoActivoCodigo, CampoEvaluacion.TIPO_ACTIVO, "Elige el tipo de activo")
         exigir(evaluacion.descripcion, CampoEvaluacion.DESCRIPCION, "La descripción es obligatoria")
+        fun limitar(valor: String, maximo: Int, campo: CampoEvaluacion) {
+            if (valor.length > maximo) add(ErrorCampo(campo, "Máximo $maximo caracteres"))
+        }
+        limitar(evaluacion.evaluador, Limites.NOMBRE, CampoEvaluacion.EVALUADOR)
+        limitar(evaluacion.organizacion, Limites.NOMBRE, CampoEvaluacion.ORGANIZACION)
+        limitar(evaluacion.descripcion, Limites.DESCRIPCION, CampoEvaluacion.DESCRIPCION)
         if (evaluacion.nivelDano == null) {
             add(ErrorCampo(CampoEvaluacion.NIVEL_DANO, "Elige el nivel de daño"))
         }
