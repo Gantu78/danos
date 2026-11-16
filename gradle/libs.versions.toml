@@ -23,6 +23,7 @@ playServicesLocation = "21.4.0"
 kotlinxCoroutines = "1.11.0"
 coil = "3.4.0"
 exifinterface = "1.4.2"
+appauth = "0.11.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -64,6 +65,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+openid-appauth = { group = "net.openid", name = "appauth", version.ref = "appauth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
