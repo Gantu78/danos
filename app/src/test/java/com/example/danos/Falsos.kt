@@ -1,14 +1,25 @@
 package com.example.danos
 
+import android.content.Intent
+import com.example.danos.acceso.IdentidadRepositorio
 import com.example.danos.dominio.Activo
 import com.example.danos.dominio.Configuracion
+import com.example.danos.dominio.EMISOR_OIDC_POR_DEFECTO
 import com.example.danos.dominio.EstadoEvaluacion
 import com.example.danos.dominio.EstadoSync
 import com.example.danos.dominio.Evaluacion
 import com.example.danos.dominio.Evidencia
+import com.example.danos.dominio.MENSAJE_INICIAR_SESION
 import com.example.danos.dominio.NivelDano
+import com.example.danos.dominio.Resultado
+import com.example.danos.dominio.ResultadoToken
+import com.example.danos.dominio.SesionIdentidad
+import com.example.danos.dominio.TipoError
 import com.example.danos.infraestructura.local.ActivoDao
 import com.example.danos.infraestructura.local.ActivoEntity
+import com.example.danos.infraestructura.local.CatalogoDao
+import com.example.danos.infraestructura.local.CriterioNivelEntity
+import com.example.danos.infraestructura.local.DesastreEntity
 import com.example.danos.infraestructura.local.EjecutorTransaccion
 import com.example.danos.infraestructura.local.EvaluacionDao
 import com.example.danos.infraestructura.local.EvaluacionEntity
@@ -17,6 +28,7 @@ import com.example.danos.infraestructura.local.EvidenciaEntity
 import com.example.danos.infraestructura.local.FilaEvaluacion
 import com.example.danos.infraestructura.local.OperacionDao
 import com.example.danos.infraestructura.local.OperacionEntity
+import com.example.danos.infraestructura.local.TipoActivoEntity
 import com.example.danos.infraestructura.preferencias.PreferenciasLocales
 import com.example.danos.infraestructura.remoto.DanosApi
 import com.example.danos.infraestructura.remoto.DescargaDto
@@ -24,9 +36,9 @@ import com.example.danos.infraestructura.remoto.LoteSincronizacionDto
 import com.example.danos.infraestructura.remoto.RespuestaSincronizacionDto
 import com.example.danos.infraestructura.sync.ProgramadorSincronizacion
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.MutableStateFlow
 import okhttp3.MultipartBody
 import retrofit2.Response
 import java.time.Instant
@@ -47,12 +59,122 @@ class PreferenciasFalsas(
 ) : PreferenciasLocales {
     override val configuracion: Flow<Configuracion?> get() = flowOf(config)
     override val ultimaDescarga = MutableStateFlow<Instant?>(null)
+    override val marcadorDesde = MutableStateFlow<String?>(null)
+    override val authStateCifrado = MutableStateFlow<String?>(null)
+    override val requiereReautenticacion = MutableStateFlow(false)
+
     override suspend fun actual(): Configuracion? = config
+
     override suspend fun guardar(evaluador: String, organizacion: String, urlApi: String) {
-        config = Configuracion(evaluador, organizacion, urlApi, config?.idDispositivo ?: "disp-1")
+        config = Configuracion(
+            evaluador = evaluador,
+            organizacion = organizacion,
+            urlApi = urlApi,
+            idDispositivo = config?.idDispositivo ?: "disp-1",
+            urlEmisor = config?.urlEmisor ?: EMISOR_OIDC_POR_DEFECTO,
+            modoEncabezados = config?.modoEncabezados ?: false,
+        )
     }
+
+    override suspend fun guardarConfiguracionCompleta(
+        evaluador: String,
+        organizacion: String,
+        urlApi: String,
+        urlEmisor: String,
+        modoEncabezados: Boolean,
+    ) {
+        config = Configuracion(
+            evaluador = evaluador,
+            organizacion = organizacion,
+            urlApi = urlApi,
+            idDispositivo = config?.idDispositivo ?: "disp-1",
+            urlEmisor = urlEmisor,
+            modoEncabezados = modoEncabezados,
+        )
+    }
+
     override suspend fun guardarUltimaDescarga(instante: Instant) {
         ultimaDescarga.value = instante
+    }
+
+    override suspend fun obtenerMarcadorDesde(): String? = marcadorDesde.value
+
+    override suspend fun guardarMarcadorDesde(desde: String?) {
+        marcadorDesde.value = desde
+    }
+
+    override suspend fun obtenerAuthStateCifrado(): String? = authStateCifrado.value
+
+    override suspend fun guardarAuthStateCifrado(
+        cifrado: String?,
+        evaluador: String?,
+        organizacion: String?,
+    ) {
+        authStateCifrado.value = cifrado
+        val actual = config
+        if (actual != null && (evaluador != null || organizacion != null)) {
+            config = actual.copy(
+                evaluador = evaluador ?: actual.evaluador,
+                organizacion = organizacion ?: actual.organizacion,
+            )
+        }
+    }
+
+    override suspend fun guardarRequiereReautenticacion(requiere: Boolean) {
+        requiereReautenticacion.value = requiere
+    }
+}
+
+class IdentidadFalsa(
+    sesionInicial: SesionIdentidad? = SesionIdentidad(
+        usuario = "evaluador.armenia",
+        organizacion = "alcaldia-armenia",
+        roles = setOf("evaluador"),
+    ),
+    var tokenActual: String = "token-falso-vigente",
+    var refreshTokenVencido: Boolean = false,
+) : IdentidadRepositorio {
+    private val _sesion = MutableStateFlow(sesionInicial)
+    private val _requiereInicioSesion = MutableStateFlow(false)
+    var llamadasObtenerToken = 0
+
+    override val sesion: Flow<SesionIdentidad?> = _sesion
+    override val requiereInicioSesion: Flow<Boolean> = _requiereInicioSesion
+
+    override suspend fun sesionActual(): SesionIdentidad? = _sesion.value
+
+    override suspend fun prepararInicioSesion(urlEmisor: String): Resultado<Intent> =
+        Resultado.Error(TipoError.CLIENTE, "No aplica en prueba unitaria JVM")
+
+    override suspend fun procesarRespuestaAutorizacion(datosResultado: Intent?): Resultado<SesionIdentidad> =
+        Resultado.Error(TipoError.CLIENTE, "No aplica en prueba unitaria JVM")
+
+    override suspend fun obtenerTokenFresco(): ResultadoToken {
+        llamadasObtenerToken++
+        val actual = _sesion.value
+        if (refreshTokenVencido || actual == null) {
+            _requiereInicioSesion.value = true
+            return ResultadoToken.SesionExpirada(MENSAJE_INICIAR_SESION)
+        }
+        _requiereInicioSesion.value = false
+        return ResultadoToken.Exito(tokenActual, actual)
+    }
+
+    override suspend fun marcarReautenticacionRequerida() {
+        _requiereInicioSesion.value = true
+    }
+
+    override suspend fun cerrarSesion(): Resultado<Unit> {
+        _sesion.value = null
+        _requiereInicioSesion.value = false
+        return Resultado.Exito(Unit)
+    }
+
+    fun iniciarSesionCon(sesionNueva: SesionIdentidad, nuevoToken: String = "token-renovado") {
+        _sesion.value = sesionNueva
+        tokenActual = nuevoToken
+        refreshTokenVencido = false
+        _requiereInicioSesion.value = false
     }
 }
 
@@ -129,7 +251,69 @@ class EvidenciaDaoFalso(private val evaluaciones: EvaluacionDaoFalso) : Evidenci
     }
 }
 
-class ActivoDaoFalso : ActivoDao {
+class CatalogoDaoFalso(
+    private val evaluaciones: EvaluacionDaoFalso? = null,
+    private val operaciones: OperacionDaoFalso? = null,
+) : CatalogoDao {
+    val tipos = linkedMapOf<String, TipoActivoEntity>()
+    val criterios = mutableListOf<CriterioNivelEntity>()
+    val desastres = linkedMapOf<String, DesastreEntity>()
+
+    override fun observarTipos(): Flow<List<TipoActivoEntity>> = flowOf(tipos.values.sortedBy { it.nombre })
+    override suspend fun obtenerTipo(codigo: String): TipoActivoEntity? = tipos[codigo]
+    override fun observarCriterios(): Flow<List<CriterioNivelEntity>> = flowOf(criterios.toList())
+    override fun observarDesastres(): Flow<List<DesastreEntity>> = flowOf(desastres.values.sortedBy { it.nombre })
+    override suspend fun obtenerDesastres(): List<DesastreEntity> = desastres.values.sortedBy { it.nombre }
+
+    override suspend fun borrarCriterios() {
+        criterios.clear()
+    }
+
+    override suspend fun borrarCriteriosDeTipo(tipoCodigo: String) {
+        criterios.removeAll { it.tipoCodigo == tipoCodigo }
+    }
+
+    override suspend fun borrarTipos() {
+        tipos.clear()
+    }
+
+    override suspend fun borrarDesastres() {
+        desastres.clear()
+    }
+
+    override suspend fun borrarDesastresPorIds(ids: List<String>) {
+        ids.forEach { desastres.remove(it) }
+    }
+
+    override suspend fun idsDesastresConEvaluacionesPendientes(): List<String> {
+        val evals = evaluaciones?.filas?.values.orEmpty()
+        val idsEvalsEnCola = operaciones?.filas?.mapTo(HashSet()) { it.evaluacionId }.orEmpty()
+        return evals
+            .filter { it.desastreId != null && (it.estadoSync == EstadoSync.PENDIENTE || it.id in idsEvalsEnCola) }
+            .mapNotNull { it.desastreId }
+            .distinct()
+    }
+
+    override suspend fun insertarTipos(tipos: List<TipoActivoEntity>) {
+        tipos.forEach { this.tipos[it.codigo] = it }
+    }
+
+    override suspend fun insertarCriterios(criterios: List<CriterioNivelEntity>) {
+        criterios.forEach { nuevo ->
+            this.criterios.removeAll { it.tipoCodigo == nuevo.tipoCodigo && it.nivel == nuevo.nivel }
+            this.criterios += nuevo
+        }
+    }
+
+    override suspend fun insertarDesastres(desastres: List<DesastreEntity>) {
+        desastres.forEach { this.desastres[it.id] = it }
+    }
+}
+
+class ActivoDaoFalso(
+    private val operaciones: OperacionDaoFalso? = null,
+    private val evaluaciones: EvaluacionDaoFalso? = null,
+) : ActivoDao {
     val filas = linkedMapOf<String, ActivoEntity>()
     private val cambios = MutableStateFlow(0)
 
@@ -137,27 +321,57 @@ class ActivoDaoFalso : ActivoDao {
     override suspend fun obtener(id: String) = filas[id]
     override suspend fun guardar(activo: ActivoEntity) {
         filas[activo.id] = activo
+        cambios.value++
     }
     override suspend fun guardarTodos(activos: List<ActivoEntity>) {
         activos.forEach { filas[it.id] = it }
+        cambios.value++
     }
-    override suspend fun idsProtegidos(): List<String> = filas.values.filter { it.versionDescargada == null }.map { it.id }
-    override suspend fun borrarDescargadosReemplazables() = Unit
+    override suspend fun idsProtegidos(): List<String> {
+        val enOperacion = operaciones?.filas?.mapTo(HashSet()) { it.activoId }.orEmpty()
+        return filas.values
+            .filter { it.versionDescargada == null || it.id in enOperacion }
+            .map { it.id }
+    }
+    override suspend fun borrarDescargadosReemplazables() {
+        val enOperacion = operaciones?.filas?.mapTo(HashSet()) { it.activoId }.orEmpty()
+        val enEvaluacion = evaluaciones?.filas?.values?.mapTo(HashSet()) { it.activoId }.orEmpty()
+        val aBorrar = filas.values
+            .filter { it.versionDescargada != null && it.id !in enOperacion && it.id !in enEvaluacion }
+            .map { it.id }
+        aBorrar.forEach { filas.remove(it) }
+        cambios.value++
+    }
     override suspend fun actualizarVersion(id: String, version: Int) {
         filas[id] = filas.getValue(id).copy(versionDescargada = version)
+        cambios.value++
     }
 }
 
+data class ConsultaDescarga(
+    val desastreId: String?,
+    val zona: String?,
+    val desde: String?,
+)
+
 class ApiFalsa(
+    var alDescargar: suspend (ConsultaDescarga) -> DescargaDto = {
+        DescargaDto("2026-01-01T00:00:00Z")
+    },
     var alSincronizar: suspend (LoteSincronizacionDto) -> RespuestaSincronizacionDto = {
         RespuestaSincronizacionDto()
     },
     var alSubir: suspend (String) -> Response<Unit> = { Response.success(Unit) },
 ) : DanosApi {
+    val descargas = mutableListOf<ConsultaDescarga>()
     val lotes = mutableListOf<LoteSincronizacionDto>()
     val subidas = mutableListOf<String>()
 
-    override suspend fun descargar(desastreId: String?): DescargaDto = DescargaDto("2026-01-01T00:00:00Z")
+    override suspend fun descargar(desastreId: String?, zona: String?, desde: String?): DescargaDto {
+        val consulta = ConsultaDescarga(desastreId, zona, desde)
+        descargas += consulta
+        return alDescargar(consulta)
+    }
 
     override suspend fun sincronizar(lote: LoteSincronizacionDto): RespuestaSincronizacionDto {
         lotes += lote
@@ -205,4 +419,5 @@ fun evidenciaDePrueba(id: String = "foto-1", evaluacionId: String = "eval-1", ru
     tamanoBytes = 1024,
 )
 
-fun activoDePrueba(id: String = "activo-1", version: Int? = 3) = Activo(id, "VIV", 4.6, -74.1, "CL 10 # 5-20", version)
+fun activoDePrueba(id: String = "activo-1", version: Int? = 3, codigoMunicipio: String? = null) =
+    Activo(id, "VIV", 4.6, -74.1, "CL 10 # 5-20", version, codigoMunicipio)

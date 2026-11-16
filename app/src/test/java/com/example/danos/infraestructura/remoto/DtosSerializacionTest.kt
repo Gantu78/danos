@@ -45,6 +45,38 @@ class DtosSerializacionTest {
     }
 
     @Test
+    fun `lee los campos aditivos del contrato nuevo de descarga`() {
+        val json = """
+            {
+              "instanteServidor": "2026-11-16T10:15:30Z",
+              "incremental": true,
+              "desde": "2026-11-16T08:00:00Z",
+              "tiposActivo": [
+                {"codigo":"VIV","nombre":"Vivienda","version":4,"criterios":[]}
+              ],
+              "desastres": [
+                {"id":"d1","nombre":"Sismo","tipo":"SISMO","estado":"EN_EVALUACION","codigosMunicipio":["63001","63130"]}
+              ],
+              "activos": [
+                {"id":"a1","tipoCodigo":"VIV","lat":4.53,"lon":-75.68,"referencia":"CL 10","version":3,"codigoMunicipio":"63001"}
+              ]
+            }
+        """.trimIndent()
+
+        val dto = JsonDanos.decodeFromString<DescargaDto>(json)
+
+        assertTrue(dto.incremental)
+        assertEquals("2026-11-16T08:00:00Z", dto.desde)
+        assertEquals(4, dto.tiposActivo.single().aDominio().version)
+        val desastre = dto.desastres.single().aDominio()
+        assertEquals("EN_EVALUACION", desastre.estado)
+        assertEquals(listOf("63001", "63130"), desastre.codigosMunicipio)
+        val activo = dto.activos.single().aDominio()
+        assertEquals("63001", activo.codigoMunicipio)
+        assertEquals("CL 10 (63001)", activo.referenciaConMunicipio)
+    }
+
+    @Test
     fun `acepta fechas con desplazamiento`() {
         assertEquals(Instant.parse("2026-03-01T10:00:00Z"), instanteDesdeIso("2026-03-01T10:00:00+00:00"))
     }

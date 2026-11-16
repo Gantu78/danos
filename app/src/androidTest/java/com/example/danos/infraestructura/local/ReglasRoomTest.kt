@@ -2,8 +2,10 @@ package com.example.danos.infraestructura.local
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.testing.MigrationTestHelper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import com.example.danos.acceso.CatalogoRepositorioImpl
 import com.example.danos.acceso.EvaluacionRepositorioImpl
 import com.example.danos.dominio.Activo
@@ -33,6 +35,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import retrofit2.Response
@@ -41,6 +44,12 @@ import java.time.Instant
 
 @RunWith(AndroidJUnit4::class)
 class ReglasRoomTest {
+    @get:Rule
+    val ayudanteMigracion = MigrationTestHelper(
+        InstrumentationRegistry.getInstrumentation(),
+        AppDatabase::class.java,
+    )
+
     private lateinit var bd: AppDatabase
     private lateinit var evaluaciones: EvaluacionRepositorioImpl
     private lateinit var catalogo: CatalogoRepositorioImpl
@@ -59,7 +68,7 @@ class ReglasRoomTest {
     }
 
     private val api = object : DanosApi {
-        override suspend fun descargar(desastreId: String?) = descarga
+        override suspend fun descargar(desastreId: String?, zona: String?, desde: String?) = descarga
         override suspend fun sincronizar(lote: LoteSincronizacionDto) = alSincronizar(lote)
         override suspend fun subirEvidencia(id: String, archivo: MultipartBody.Part) = Response.success(Unit)
     }
@@ -195,11 +204,57 @@ class ReglasRoomTest {
     fun laDescargaFallidaConservaLoDescargado() = runTest {
         bd.catalogoDao().insertarTipos(listOf(TipoActivoEntity("VIV", "Vivienda")))
         val fallida = object : DanosApi by api {
-            override suspend fun descargar(desastreId: String?): DescargaDto = throw IOException("sin red")
+            override suspend fun descargar(desastreId: String?, zona: String?, desde: String?): DescargaDto =
+                throw IOException("sin red")
         }
         val repo = CatalogoRepositorioImpl(fallida, EjecutorTransaccionRoom(bd), bd.catalogoDao(), bd.activoDao(), preferencias)
 
         assertTrue(repo.descargar(null) is Resultado.Error)
         assertEquals(1, repo.observarTipos().first().size)
+    }
+
+    @Test
+    fun migracionDe1A2ConservaEvaluacionesYOperacionesPendientes() = runTest {
+        val nombreBd = "migracion-prueba-danos.db"
+        ayudanteMigracion.createDatabase(nombreBd, 1).apply {
+            execSQL("INSERT INTO `tipo_activo` (`codigo`, `nombre`) VALUES ('VIV', 'Vivienda')")
+            execSQL("INSERT INTO `desastre` (`id`, `nombre`, `tipo`) VALUES ('d-1', 'Sismo Armenia', 'SISMO')")
+            execSQL(
+                """INSERT INTO `activo` (`id`, `tipoCodigo`, `lat`, `lon`, `referencia`, `versionDescargada`)
+                   VALUES ('a-1', 'VIV', 4.53, -75.68, 'CL 10 # 5-20', 2)""",
+            )
+            execSQL(
+                """INSERT INTO `evaluacion` (`id`, `activoId`, `desastreId`, `instanteCampo`, `evaluador`,
+                   `organizacion`, `lat`, `lon`, `precisionM`, `tipoActivoCodigo`, `nivelDano`, `descripcion`,
+                   `estadoEvaluacion`, `estadoSync`, `motivoInvalida`, `conocidaPorServidor`)
+                   VALUES ('eval-pendiente', 'a-1', 'd-1', 1772360000000, 'evaluador.armenia',
+                   'alcaldia-armenia', 4.53, -75.68, 5.0, 'VIV', 'GRAVE', 'Colapso parcial',
+                   'REGISTRADA', 'PENDIENTE', NULL, 0)""",
+            )
+            execSQL(
+                """INSERT INTO `operacion` (`idOperacion`, `tipo`, `evaluacionId`, `activoId`,
+                   `versionBaseActivo`, `payloadJson`, `creada`, `intentos`, `ultimoError`)
+                   VALUES ('op-1', 'CREAR', 'eval-pendiente', 'a-1', 2, '{"id":"eval-pendiente"}', 1772360000000, 0, NULL)""",
+            )
+            close()
+        }
+
+        ayudanteMigracion.runMigrationsAndValidate(nombreBd, 2, true, MIGRACION_1_2).close()
+
+        val contexto = ApplicationProvider.getApplicationContext<Context>()
+        val bdMigrada = Room.databaseBuilder(contexto, AppDatabase::class.java, nombreBd)
+            .addMigrations(MIGRACION_1_2)
+            .build()
+        try {
+            val evalConservada = bdMigrada.evaluacionDao().obtener("eval-pendiente")
+            assertNotNull(evalConservada)
+            assertEquals("evaluador.armenia", evalConservada?.evaluador)
+            assertEquals(1, bdMigrada.operacionDao().contar())
+            assertEquals("op-1", bdMigrada.operacionDao().obtener("op-1")?.idOperacion)
+            assertEquals(1, bdMigrada.catalogoDao().obtenerTipo("VIV")?.version)
+        } finally {
+            bdMigrada.close()
+            contexto.deleteDatabase(nombreBd)
+        }
     }
 }

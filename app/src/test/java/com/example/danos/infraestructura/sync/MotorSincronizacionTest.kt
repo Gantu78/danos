@@ -4,20 +4,25 @@ import com.example.danos.ActivoDaoFalso
 import com.example.danos.ApiFalsa
 import com.example.danos.EvaluacionDaoFalso
 import com.example.danos.EvidenciaDaoFalso
+import com.example.danos.IdentidadFalsa
 import com.example.danos.OperacionDaoFalso
 import com.example.danos.PreferenciasFalsas
 import com.example.danos.ProgramadorFalso
 import com.example.danos.TransaccionDirecta
 import com.example.danos.acceso.EvaluacionRepositorioImpl
+import com.example.danos.acceso.SincronizacionRepositorioImpl
 import com.example.danos.activoDePrueba
 import com.example.danos.dominio.EstadoEvaluacion
 import com.example.danos.dominio.EstadoSync
+import com.example.danos.dominio.MENSAJE_INICIAR_SESION
+import com.example.danos.dominio.SesionIdentidad
 import com.example.danos.evaluacionDePrueba
 import com.example.danos.evidenciaDePrueba
 import com.example.danos.infraestructura.remoto.JsonDanos
 import com.example.danos.infraestructura.remoto.LoteSincronizacionDto
 import com.example.danos.infraestructura.remoto.RespuestaSincronizacionDto
 import com.example.danos.infraestructura.remoto.ResultadoOperacionDto
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
@@ -315,5 +320,44 @@ class MotorSincronizacionTest {
         assertEquals(DesenlaceCiclo.REINTENTAR, motor.ejecutarCiclo())
 
         assertFalse(evidencias.filas.getValue("foto-1").subida)
+    }
+
+    @Test
+    fun `la cola sobrevive a un refresh token vencido y sincroniza tras volver a iniciar sesion`() = runTest {
+        val identidad = IdentidadFalsa(refreshTokenVencido = true)
+        val motorConOidc = MotorSincronizacion(
+            TransaccionDirecta(),
+            operaciones,
+            evaluaciones,
+            evidencias,
+            activos,
+            api,
+            preferencias,
+            identidad,
+        )
+        val syncRepo = SincronizacionRepositorioImpl(operaciones, evidencias, ProgramadorFalso(), identidad)
+
+        encolarUna()
+
+        // Con el refresh token vencido, el worker/motor pide reintento sin tocar la cola ni enviar lotes.
+        assertEquals(DesenlaceCiclo.REINTENTAR, motorConOidc.ejecutarCiclo())
+        assertTrue(api.lotes.isEmpty())
+        assertEquals(1, operaciones.filas.size)
+        assertEquals(0, operaciones.filas.single().intentos)
+        assertNull(operaciones.filas.single().ultimoError)
+        assertEquals(EstadoSync.PENDIENTE, evaluaciones.filas.getValue("eval-1").estadoSync)
+        assertEquals(MENSAJE_INICIAR_SESION, syncRepo.observarUltimoError().first())
+
+        // El evaluador vuelve a iniciar sesión y el siguiente ciclo sincroniza la cola intacta.
+        identidad.iniciarSesionCon(
+            SesionIdentidad("evaluador.armenia", "alcaldia-armenia", setOf("evaluador")),
+            nuevoToken = "token-nuevo",
+        )
+        responderTodas("APLICADA")
+
+        assertEquals(DesenlaceCiclo.TERMINADO, motorConOidc.ejecutarCiclo())
+        assertTrue(operaciones.filas.isEmpty())
+        assertEquals(EstadoSync.CONFIRMADA, evaluaciones.filas.getValue("eval-1").estadoSync)
+        assertNull(syncRepo.observarUltimoError().first())
     }
 }
