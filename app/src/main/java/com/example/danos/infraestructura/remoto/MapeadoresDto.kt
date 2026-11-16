@@ -14,16 +14,22 @@ import java.time.format.DateTimeFormatter
 fun instanteDesdeIso(texto: String): Instant =
     DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(texto, Instant::from)
 
-fun TipoActivoDto.aDominio() = TipoActivo(codigo, nombre)
+fun TipoActivoDto.aDominio() = TipoActivo(codigo, nombre, version)
 
 /** Descarta los criterios con un nivel que esta versión de la app no conoce. */
 fun TipoActivoDto.criteriosADominio(): List<CriterioNivel> = criterios.mapNotNull { dto ->
     NivelDano.entries.firstOrNull { it.name == dto.nivel }?.let { CriterioNivel(codigo, it, dto.criterio) }
 }
 
-fun DesastreDto.aDominio() = Desastre(id, nombre, tipo)
+fun DesastreDto.aDominio() = Desastre(
+    id = id,
+    nombre = nombre,
+    tipo = tipo,
+    estado = estado,
+    codigosMunicipio = codigosMunicipio.orEmpty(),
+)
 
-fun ActivoDto.aDominio() = Activo(id, tipoCodigo, lat, lon, referencia, version)
+fun ActivoDto.aDominio() = Activo(id, tipoCodigo, lat, lon, referencia, version, codigoMunicipio)
 
 fun Activo.aActivoNuevoDto() = ActivoNuevoDto(id, tipoCodigo, lat, lon, referencia)
 

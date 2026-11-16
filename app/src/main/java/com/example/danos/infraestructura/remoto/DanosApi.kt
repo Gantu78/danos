@@ -13,7 +13,11 @@ import retrofit2.http.Query
 
 interface DanosApi {
     @GET("v1/descarga")
-    suspend fun descargar(@Query("desastreId") desastreId: String?): DescargaDto
+    suspend fun descargar(
+        @Query("desastreId") desastreId: String?,
+        @Query("zona") zona: String? = null,
+        @Query("desde") desde: String? = null,
+    ): DescargaDto
 
     @POST("v1/sincronizacion/evaluaciones")
     suspend fun sincronizar(@Body lote: LoteSincronizacionDto): RespuestaSincronizacionDto

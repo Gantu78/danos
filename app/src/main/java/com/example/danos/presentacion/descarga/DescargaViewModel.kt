@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -35,25 +34,50 @@ class DescargaViewModel @Inject constructor(
             catalogo.observarTipos(),
             catalogo.observarActivos(),
             catalogo.observarUltimaDescarga(),
-        ) { desastres, tipos, activos, ultima ->
-            _estado.update {
-                it.copy(
+            catalogo.observarMarcadorDesde(),
+        ) { desastres, tipos, activos, ultima, desde ->
+            _estado.update { actual ->
+                val desastreValido = actual.desastreId?.takeIf { id -> desastres.any { it.id == id } }
+                val municipios = desastres.firstOrNull { it.id == desastreValido }?.codigosMunicipio.orEmpty()
+                val zonaValida = actual.zona?.takeIf { it in municipios }
+                actual.copy(
                     desastres = desastres,
+                    desastreId = desastreValido,
+                    zona = zonaValida,
                     numTipos = tipos.size,
                     numActivos = activos.size,
                     ultimaDescarga = ultima,
+                    marcadorDesde = desde,
                 )
             }
         }.launchIn(viewModelScope)
     }
 
-    fun alElegirDesastre(id: String?) = _estado.update { it.copy(desastreId = id) }
+    fun alElegirDesastre(id: String?) = _estado.update { actual ->
+        val municipios = actual.desastres.firstOrNull { it.id == id }?.codigosMunicipio.orEmpty()
+        actual.copy(
+            desastreId = id,
+            zona = actual.zona?.takeIf { it in municipios },
+        )
+    }
 
-    fun descargar() {
+    fun alElegirZona(codigoMunicipio: String?) = _estado.update { it.copy(zona = codigoMunicipio) }
+
+    fun descargar() = ejecutarDescarga(forzarCompleta = false)
+
+    fun descargarCompleta() = ejecutarDescarga(forzarCompleta = true)
+
+    private fun ejecutarDescarga(forzarCompleta: Boolean) {
+        val actual = _estado.value
         _estado.update { it.copy(descargando = true) }
         viewModelScope.launch {
-            val texto = when (val resultado = catalogo.descargar(_estado.value.desastreId)) {
-                is Resultado.Exito -> "Descarga completa"
+            val resultado = catalogo.descargar(
+                desastreId = actual.desastreId,
+                zona = actual.zona,
+                forzarCompleta = forzarCompleta,
+            )
+            val texto = when (resultado) {
+                is Resultado.Exito -> if (forzarCompleta) "Descarga completa realizada" else "Descarga actualizada"
                 is Resultado.Error -> "${resultado.mensaje}. Se conserva lo ya descargado."
             }
             _estado.update { it.copy(descargando = false) }

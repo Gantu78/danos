@@ -14,6 +14,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -53,7 +54,9 @@ fun DescargaRuta(
         estado = estado,
         avisos = avisos,
         alElegirDesastre = viewModel::alElegirDesastre,
+        alElegirZona = viewModel::alElegirZona,
         alDescargar = viewModel::descargar,
+        alDescargarCompleta = viewModel::descargarCompleta,
         alVolver = alVolver,
     )
 }
@@ -64,7 +67,9 @@ fun DescargaPantalla(
     estado: DescargaEstado,
     avisos: SnackbarHostState,
     alElegirDesastre: (String?) -> Unit,
+    alElegirZona: (String?) -> Unit = {},
     alDescargar: () -> Unit,
+    alDescargarCompleta: () -> Unit = {},
     alVolver: () -> Unit,
 ) {
     Scaffold(
@@ -96,12 +101,32 @@ fun DescargaPantalla(
                 textoVacio = sinDesastre,
                 alSeleccionar = alElegirDesastre,
             )
+
+            if (estado.municipiosDisponibles.isNotEmpty()) {
+                val todasLasZonas = stringResource(R.string.todas_las_zonas)
+                Text(stringResource(R.string.elegir_zona), style = MaterialTheme.typography.titleSmall)
+                Selector(
+                    opciones = listOf(OpcionSelector<String?>(null, todasLasZonas)) +
+                        estado.municipiosDisponibles.map { OpcionSelector<String?>(it, it) },
+                    seleccionado = estado.zona,
+                    textoVacio = todasLasZonas,
+                    alSeleccionar = alElegirZona,
+                )
+            }
+
             Button(
                 onClick = alDescargar,
                 enabled = !estado.descargando,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.descargar))
+            }
+            OutlinedButton(
+                onClick = alDescargarCompleta,
+                enabled = !estado.descargando,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.descarga_completa))
             }
             if (estado.descargando) LinearProgressIndicator(Modifier.fillMaxWidth())
             Text(
@@ -120,6 +145,12 @@ fun DescargaPantalla(
 @Composable
 private fun DescargaPantallaPreview() {
     DanosTheme {
-        DescargaPantalla(DescargaEstado(numActivos = 12, numTipos = 3), SnackbarHostState(), {}, {}, {})
+        DescargaPantalla(
+            estado = DescargaEstado(numActivos = 12, numTipos = 3),
+            avisos = SnackbarHostState(),
+            alElegirDesastre = {},
+            alDescargar = {},
+            alVolver = {},
+        )
     }
 }

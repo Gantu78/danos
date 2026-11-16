@@ -15,20 +15,43 @@ interface CatalogoDao {
     @Query("SELECT * FROM tipo_activo ORDER BY nombre")
     fun observarTipos(): Flow<List<TipoActivoEntity>>
 
+    @Query("SELECT * FROM tipo_activo WHERE codigo = :codigo")
+    suspend fun obtenerTipo(codigo: String): TipoActivoEntity?
+
     @Query("SELECT * FROM criterio_nivel")
     fun observarCriterios(): Flow<List<CriterioNivelEntity>>
 
     @Query("SELECT * FROM desastre ORDER BY nombre")
     fun observarDesastres(): Flow<List<DesastreEntity>>
 
+    @Query("SELECT * FROM desastre ORDER BY nombre")
+    suspend fun obtenerDesastres(): List<DesastreEntity>
+
     @Query("DELETE FROM criterio_nivel")
     suspend fun borrarCriterios()
+
+    @Query("DELETE FROM criterio_nivel WHERE tipoCodigo = :tipoCodigo")
+    suspend fun borrarCriteriosDeTipo(tipoCodigo: String)
 
     @Query("DELETE FROM tipo_activo")
     suspend fun borrarTipos()
 
     @Query("DELETE FROM desastre")
     suspend fun borrarDesastres()
+
+    @Query("DELETE FROM desastre WHERE id IN (:ids)")
+    suspend fun borrarDesastresPorIds(ids: List<String>)
+
+    /**
+     * Desastres que tienen evaluaciones locales aún pendientes de sincronizar y por tanto no deben
+     * retirarse de la lista local aunque dejen de llegar en una descarga completa (DA-19).
+     */
+    @Query(
+        """SELECT DISTINCT desastreId FROM evaluacion
+           WHERE desastreId IS NOT NULL
+             AND (estadoSync = 'PENDIENTE' OR id IN (SELECT evaluacionId FROM operacion))""",
+    )
+    suspend fun idsDesastresConEvaluacionesPendientes(): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertarTipos(tipos: List<TipoActivoEntity>)

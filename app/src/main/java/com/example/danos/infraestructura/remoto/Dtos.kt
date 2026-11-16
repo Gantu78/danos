@@ -17,6 +17,8 @@ data class DescargaDto(
     val tiposActivo: List<TipoActivoDto> = emptyList(),
     val desastres: List<DesastreDto> = emptyList(),
     val activos: List<ActivoDto> = emptyList(),
+    val incremental: Boolean = false,
+    val desde: String? = null,
 )
 
 @Serializable
@@ -24,13 +26,20 @@ data class TipoActivoDto(
     val codigo: String,
     val nombre: String,
     val criterios: List<CriterioDto> = emptyList(),
+    val version: Int = 1,
 )
 
 @Serializable
 data class CriterioDto(val nivel: String, val criterio: String)
 
 @Serializable
-data class DesastreDto(val id: String, val nombre: String, val tipo: String)
+data class DesastreDto(
+    val id: String,
+    val nombre: String,
+    val tipo: String,
+    val estado: String? = null,
+    val codigosMunicipio: List<String>? = null,
+)
 
 @Serializable
 data class ActivoDto(
@@ -40,6 +49,7 @@ data class ActivoDto(
     val lon: Double,
     val referencia: String,
     val version: Int,
+    val codigoMunicipio: String? = null,
 )
 
 @Serializable

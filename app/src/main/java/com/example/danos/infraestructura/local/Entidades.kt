@@ -1,5 +1,6 @@
 package com.example.danos.infraestructura.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -13,13 +14,23 @@ import com.example.danos.dominio.TipoOperacion
 import java.time.Instant
 
 @Entity(tableName = "tipo_activo")
-data class TipoActivoEntity(@PrimaryKey val codigo: String, val nombre: String)
+data class TipoActivoEntity(
+    @PrimaryKey val codigo: String,
+    val nombre: String,
+    @ColumnInfo(defaultValue = "1") val version: Int = 1,
+)
 
 @Entity(tableName = "criterio_nivel", primaryKeys = ["tipoCodigo", "nivel"])
 data class CriterioNivelEntity(val tipoCodigo: String, val nivel: NivelDano, val criterio: String)
 
 @Entity(tableName = "desastre")
-data class DesastreEntity(@PrimaryKey val id: String, val nombre: String, val tipo: String)
+data class DesastreEntity(
+    @PrimaryKey val id: String,
+    val nombre: String,
+    val tipo: String,
+    val estado: String? = null,
+    @ColumnInfo(defaultValue = "''") val codigosMunicipio: String = "",
+)
 
 @Entity(tableName = "activo")
 data class ActivoEntity(
@@ -29,6 +40,7 @@ data class ActivoEntity(
     val lon: Double,
     val referencia: String,
     val versionDescargada: Int?,
+    val codigoMunicipio: String? = null,
 )
 
 /**

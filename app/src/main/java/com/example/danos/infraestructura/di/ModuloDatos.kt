@@ -11,6 +11,7 @@ import com.example.danos.infraestructura.local.AppDatabase
 import com.example.danos.infraestructura.local.CatalogoDao
 import com.example.danos.infraestructura.local.EvaluacionDao
 import com.example.danos.infraestructura.local.EvidenciaDao
+import com.example.danos.infraestructura.local.MIGRACION_1_2
 import com.example.danos.infraestructura.local.OperacionDao
 import dagger.Module
 import dagger.Provides
@@ -23,11 +24,13 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object ModuloDatos {
 
-    /** Sin migración destructiva: la réplica local nunca puede perder evaluaciones. */
+    /** Sin migración destructiva: la réplica local nunca puede perder evaluaciones (AD-44). */
     @Provides
     @Singleton
     fun baseDatos(@ApplicationContext contexto: Context): AppDatabase =
-        Room.databaseBuilder(contexto, AppDatabase::class.java, "danos.db").build()
+        Room.databaseBuilder(contexto, AppDatabase::class.java, "danos.db")
+            .addMigrations(MIGRACION_1_2)
+            .build()
 
     @Provides fun catalogoDao(baseDatos: AppDatabase): CatalogoDao = baseDatos.catalogoDao()
     @Provides fun activoDao(baseDatos: AppDatabase): ActivoDao = baseDatos.activoDao()

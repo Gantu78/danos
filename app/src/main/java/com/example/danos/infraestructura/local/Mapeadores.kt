@@ -8,11 +8,29 @@ import com.example.danos.dominio.Evidencia
 import com.example.danos.dominio.ResumenEvaluacion
 import com.example.danos.dominio.TipoActivo
 
-fun TipoActivoEntity.aDominio() = TipoActivo(codigo, nombre)
+fun TipoActivoEntity.aDominio() = TipoActivo(codigo, nombre, version)
+fun TipoActivo.aEntidad() = TipoActivoEntity(codigo, nombre, version)
 fun CriterioNivelEntity.aDominio() = CriterioNivel(tipoCodigo, nivel, criterio)
-fun DesastreEntity.aDominio() = Desastre(id, nombre, tipo)
-fun ActivoEntity.aDominio() = Activo(id, tipoCodigo, lat, lon, referencia, versionDescargada)
-fun Activo.aEntidad() = ActivoEntity(id, tipoCodigo, lat, lon, referencia, versionDescargada)
+fun CriterioNivel.aEntidad() = CriterioNivelEntity(tipoCodigo, nivel, criterio)
+
+fun DesastreEntity.aDominio() = Desastre(
+    id = id,
+    nombre = nombre,
+    tipo = tipo,
+    estado = estado,
+    codigosMunicipio = codigosMunicipio.split(',').map { it.trim() }.filter { it.isNotEmpty() },
+)
+
+fun Desastre.aEntidad() = DesastreEntity(
+    id = id,
+    nombre = nombre,
+    tipo = tipo,
+    estado = estado,
+    codigosMunicipio = codigosMunicipio.map { it.trim() }.filter { it.isNotEmpty() }.joinToString(","),
+)
+
+fun ActivoEntity.aDominio() = Activo(id, tipoCodigo, lat, lon, referencia, versionDescargada, codigoMunicipio)
+fun Activo.aEntidad() = ActivoEntity(id, tipoCodigo, lat, lon, referencia, versionDescargada, codigoMunicipio)
 
 fun EvidenciaEntity.aDominio() =
     Evidencia(id, evaluacionId, rutaArchivo, lat, lon, instanteCaptura, sha256, tamanoBytes, subida)
@@ -42,6 +60,6 @@ fun EvaluacionEntity.aDominio(evidencias: List<EvidenciaEntity>) = Evaluacion(
 fun FilaEvaluacion.aResumen() = ResumenEvaluacion(
     evaluacion = evaluacion.aDominio(evidencias),
     tipoActivoNombre = tipoActivo?.nombre ?: evaluacion.tipoActivoCodigo,
-    referenciaActivo = activo?.referencia ?: evaluacion.activoId,
+    referenciaActivo = activo?.aDominio()?.referenciaConMunicipio ?: evaluacion.activoId,
     fotosPendientes = evidencias.count { !it.subida },
 )
