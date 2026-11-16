@@ -2,7 +2,9 @@ package com.example.danos.presentacion.navegacion
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.danos.BuildConfig
 import com.example.danos.acceso.ConfiguracionRepositorio
+import com.example.danos.acceso.IdentidadRepositorio
 import com.example.danos.acceso.SincronizacionRepositorio
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +17,7 @@ import javax.inject.Inject
 @HiltViewModel
 class InicioViewModel @Inject constructor(
     configuracion: ConfiguracionRepositorio,
+    identidad: IdentidadRepositorio,
     sincronizacion: SincronizacionRepositorio,
 ) : ViewModel() {
 
@@ -23,7 +26,14 @@ class InicioViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _configurada.value = configuracion.actual() != null
+            val config = configuracion.actual()
+            val sesion = identidad.sesionActual()
+            val listaParaUsar = if (BuildConfig.DEBUG && config?.modoEncabezados == true) {
+                config.evaluador.isNotBlank() && config.organizacion.isNotBlank() && config.urlApi.isNotBlank()
+            } else {
+                config != null && config.urlApi.isNotBlank() && sesion != null
+            }
+            _configurada.value = listaParaUsar
             sincronizacion.sincronizarSiHayPendientes()
         }
     }

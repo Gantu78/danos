@@ -35,7 +35,11 @@ object ModuloRed {
             .addInterceptor(configuracion)
             .apply {
                 if (BuildConfig.DEBUG) {
-                    addInterceptor(HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
+                    val logger = HttpLoggingInterceptor().apply {
+                        redactHeader("Authorization")
+                        setLevel(HttpLoggingInterceptor.Level.BASIC)
+                    }
+                    addInterceptor(logger)
                 }
             }
             .build()

@@ -5,10 +5,12 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.example.danos.BuildConfig
 import com.example.danos.acceso.CatalogoRepositorio
 import com.example.danos.acceso.ConfiguracionRepositorio
 import com.example.danos.acceso.DispositivoRepositorio
 import com.example.danos.acceso.EvaluacionRepositorio
+import com.example.danos.acceso.IdentidadRepositorio
 import com.example.danos.dominio.Activo
 import com.example.danos.dominio.CampoEvaluacion
 import com.example.danos.dominio.ErrorCampo
@@ -43,6 +45,7 @@ class EvaluarViewModel @Inject constructor(
     private val estadoGuardado: SavedStateHandle,
     private val evaluaciones: EvaluacionRepositorio,
     private val configuracion: ConfiguracionRepositorio,
+    private val identidad: IdentidadRepositorio,
     private val dispositivo: DispositivoRepositorio,
     catalogo: CatalogoRepositorio,
 ) : ViewModel() {
@@ -79,7 +82,10 @@ class EvaluarViewModel @Inject constructor(
         val inicial = restaurado
             ?: existente?.aFormulario()
             ?: FormularioEvaluar(instanteCampoMs = Instant.now().toEpochMilli())
-        val soloLectura = existente != null && existente.evaluador != configuracion.actual()?.evaluador
+        val config = configuracion.actual()
+        val sesion = if (BuildConfig.DEBUG && config?.modoEncabezados == true) null else identidad.sesionActual()
+        val usuarioActual = sesion?.usuario?.takeIf { it.isNotBlank() } ?: config?.evaluador
+        val soloLectura = existente != null && existente.evaluador != usuarioActual
         _estado.update { it.copy(cargando = false, formulario = inicial, soloLectura = soloLectura) }
         guardarFormulario()
     }
@@ -264,12 +270,15 @@ class EvaluarViewModel @Inject constructor(
         _estado.update { it.copy(guardando = true) }
         viewModelScope.launch {
             val config = configuracion.actual()
+            val sesion = if (BuildConfig.DEBUG && config?.modoEncabezados == true) null else identidad.sesionActual()
+            val evaluador = sesion?.usuario?.takeIf { it.isNotBlank() } ?: config?.evaluador
+            val organizacion = sesion?.organizacion?.takeIf { it.isNotBlank() } ?: config?.organizacion
             val activoNuevo = if (evaluacionId == null && formulario.activoNuevo && !faltaReferencia && ubicacion != null) {
                 Activo(UUID.randomUUID().toString(), tipoCodigo, ubicacion.lat, ubicacion.lon, referencia, null)
             } else {
                 null
             }
-            val evaluacion = construirEvaluacion(formulario, activoNuevo?.id ?: formulario.activoId.orEmpty(), config?.evaluador, config?.organizacion)
+            val evaluacion = construirEvaluacion(formulario, activoNuevo?.id ?: formulario.activoId.orEmpty(), evaluador, organizacion)
             val errores = buildList {
                 addAll(ValidadorEvaluacion.validar(evaluacion))
                 if (ubicacion == null) add(ErrorCampo(CampoEvaluacion.UBICACION, "Falta la ubicación"))

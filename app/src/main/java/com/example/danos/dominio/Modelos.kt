@@ -69,13 +69,28 @@ data class Activo(
     val lon: Double,
     val referencia: String,
     val versionDescargada: Int?,
-)
+    val codigoMunicipio: String? = null,
+) {
+    /** Muestra el municipio DIVIPOLA junto a la referencia cuando el servidor lo envía (DA-19). */
+    val referenciaConMunicipio: String
+        get() = if (codigoMunicipio.isNullOrBlank()) referencia else "$referencia ($codigoMunicipio)"
+}
 
-data class TipoActivo(val codigo: String, val nombre: String)
+data class TipoActivo(
+    val codigo: String,
+    val nombre: String,
+    val version: Int = 1,
+)
 
 data class CriterioNivel(val tipoCodigo: String, val nivel: NivelDano, val criterio: String)
 
-data class Desastre(val id: String, val nombre: String, val tipo: String)
+data class Desastre(
+    val id: String,
+    val nombre: String,
+    val tipo: String,
+    val estado: String? = null,
+    val codigosMunicipio: List<String> = emptyList(),
+)
 
 /** Una evaluación tal como se muestra en la lista, con los nombres ya resueltos. */
 data class ResumenEvaluacion(
@@ -85,11 +100,32 @@ data class ResumenEvaluacion(
     val fotosPendientes: Int,
 )
 
+const val MENSAJE_INICIAR_SESION = "Inicie sesión para sincronizar"
+const val EMISOR_OIDC_POR_DEFECTO = "http://10.0.2.2:8180/realms/plataforma"
+
+/** Identidad extraída del token OIDC según el contrato del realm "plataforma" (DA-15). */
+data class SesionIdentidad(
+    val usuario: String,
+    val organizacion: String,
+    val roles: Set<String> = emptySet(),
+    val ambito: String? = null,
+    val territorio: String? = null,
+)
+
+sealed interface ResultadoToken {
+    data class Exito(val accessToken: String, val sesion: SesionIdentidad) : ResultadoToken
+    data object ModoEncabezados : ResultadoToken
+    data class SesionExpirada(val mensaje: String = MENSAJE_INICIAR_SESION) : ResultadoToken
+    data class ErrorRed(val mensaje: String) : ResultadoToken
+}
+
 data class Configuracion(
     val evaluador: String,
     val organizacion: String,
     val urlApi: String,
     val idDispositivo: String,
+    val urlEmisor: String = EMISOR_OIDC_POR_DEFECTO,
+    val modoEncabezados: Boolean = false,
 )
 
 data class Ubicacion(val lat: Double, val lon: Double, val precisionM: Double)

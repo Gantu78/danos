@@ -1,5 +1,6 @@
 package com.example.danos.acceso
 
+import com.example.danos.BuildConfig
 import com.example.danos.dominio.Activo
 import com.example.danos.dominio.EstadoEvaluacion
 import com.example.danos.dominio.EstadoSync
@@ -45,6 +46,7 @@ class EvaluacionRepositorioImpl @Inject constructor(
     private val activoDao: ActivoDao,
     private val preferencias: PreferenciasLocales,
     private val programador: ProgramadorSincronizacion,
+    private val identidad: IdentidadRepositorio? = null,
 ) : EvaluacionRepositorio {
 
     override fun observarResumenes(): Flow<List<ResumenEvaluacion>> =
@@ -55,10 +57,13 @@ class EvaluacionRepositorioImpl @Inject constructor(
 
     override suspend fun guardarNueva(evaluacion: Evaluacion, activoNuevo: Activo?): Resultado<Unit> =
         protegido {
+            val identidadActual = obtenerIdentidadEfectiva()
             transaccion.enTransaccion {
                 activoNuevo?.let { activoDao.guardar(it.aEntidad()) }
                 val activo = activoDao.obtener(evaluacion.activoId)?.aDominio()
                 val nueva = evaluacion.copy(
+                    evaluador = identidadActual?.first ?: evaluacion.evaluador,
+                    organizacion = identidadActual?.second ?: evaluacion.organizacion,
                     estadoEvaluacion = estadoInicial(evaluacion.desastreId),
                     estadoSync = EstadoSync.PENDIENTE,
                     motivoInvalida = null,
@@ -74,7 +79,9 @@ class EvaluacionRepositorioImpl @Inject constructor(
         }
 
     override suspend fun guardarEdicion(evaluacion: Evaluacion): Resultado<Unit> {
-        val evaluador = preferencias.actual()?.evaluador
+        val config = preferencias.actual()
+        val sesionOidc = if (BuildConfig.DEBUG && config?.modoEncabezados == true) null else identidad?.sesionActual()
+        val evaluador = sesionOidc?.usuario?.takeIf { it.isNotBlank() } ?: config?.evaluador
         return protegido {
             val resultado: Resultado<Unit> = transaccion.enTransaccion {
                 val actual = evaluacionDao.obtener(evaluacion.id)
@@ -92,6 +99,16 @@ class EvaluacionRepositorioImpl @Inject constructor(
             if (resultado is Resultado.Exito) programador.programar()
             resultado
         }
+    }
+
+    private suspend fun obtenerIdentidadEfectiva(): Pair<String, String>? {
+        val config = preferencias.actual()
+        if (BuildConfig.DEBUG && config?.modoEncabezados == true) {
+            return null
+        }
+        val sesion = identidad?.sesionActual() ?: return null
+        if (sesion.usuario.isBlank()) return null
+        return sesion.usuario to sesion.organizacion
     }
 
     private suspend fun aplicarEdicion(actual: EvaluacionEntity, cambios: Evaluacion) {

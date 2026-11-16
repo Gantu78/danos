@@ -1,5 +1,6 @@
 package com.example.danos.infraestructura.remoto
 
+import com.example.danos.dominio.MENSAJE_INICIAR_SESION
 import com.example.danos.dominio.Resultado
 import com.example.danos.dominio.TipoError
 import kotlinx.coroutines.CancellationException
@@ -22,9 +23,8 @@ suspend fun <T> llamarApi(llamada: suspend () -> T): Resultado<T> = try {
     Resultado.Error(TipoError.SERVIDOR, "El servidor envió una fecha no reconocida")
 }
 
-fun errorHttp(codigo: Int): Resultado.Error =
-    if (codigo in 400..499) {
-        Resultado.Error(TipoError.CLIENTE, "El servidor rechazó la solicitud (HTTP $codigo)")
-    } else {
-        Resultado.Error(TipoError.SERVIDOR, "Error del servidor (HTTP $codigo)")
-    }
+fun errorHttp(codigo: Int): Resultado.Error = when {
+    codigo == 401 -> Resultado.Error(TipoError.NO_PERMITIDO, MENSAJE_INICIAR_SESION)
+    codigo in 400..499 -> Resultado.Error(TipoError.CLIENTE, "El servidor rechazó la solicitud (HTTP $codigo)")
+    else -> Resultado.Error(TipoError.SERVIDOR, "Error del servidor (HTTP $codigo)")
+}

@@ -80,6 +80,7 @@ data class EvaluarEstado(
             val nombresTipo = tipos.associate { it.codigo to it.nombre }
             return activos.filter { activo ->
                 activo.referencia.contains(texto, ignoreCase = true) ||
+                    activo.codigoMunicipio.orEmpty().contains(texto, ignoreCase = true) ||
                     nombresTipo[activo.tipoCodigo].orEmpty().contains(texto, ignoreCase = true) ||
                     activo.tipoCodigo.contains(texto, ignoreCase = true)
             }.take(MAXIMO_RESULTADOS)

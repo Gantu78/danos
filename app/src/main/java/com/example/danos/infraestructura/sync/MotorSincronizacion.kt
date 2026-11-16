@@ -1,8 +1,11 @@
 package com.example.danos.infraestructura.sync
 
+import com.example.danos.BuildConfig
+import com.example.danos.acceso.IdentidadRepositorio
 import com.example.danos.dominio.EstadoEvaluacion
 import com.example.danos.dominio.EstadoSync
 import com.example.danos.dominio.Resultado
+import com.example.danos.dominio.ResultadoToken
 import com.example.danos.dominio.TipoError
 import com.example.danos.infraestructura.local.ActivoDao
 import com.example.danos.infraestructura.local.EjecutorTransaccion
@@ -39,14 +42,14 @@ sealed interface ResultadoLote {
     /** El servidor respondió sin decir nada de estas operaciones: se quedan en la cola. */
     data object SinAvance : ResultadoLote
 
-    /** Sin red o 5xx: el servidor es idempotente por idOperacion, se reenvía después. */
+    /** Sin red, 5xx o sesión OIDC pendiente de renovar/iniciar: se reenvía después sin perder la cola. */
     data object Reintentar : ResultadoLote
 
-    /** 4xx: las operaciones se quedan en la cola con su error y no se insiste en bucle. */
+    /** 4xx de validación: las operaciones se quedan en la cola con su error y no se insiste en bucle. */
     data object Detenido : ResultadoLote
 }
 
-/** Envía la cola y las evidencias. Aplica los invariantes 1 a 4 del caso de uso FP-06. */
+/** Envía la cola y las evidencias. Aplica los invariantes 1 a 4 del caso de uso FP-06 (QA-14, AD-44). */
 class MotorSincronizacion @Inject constructor(
     private val transaccion: EjecutorTransaccion,
     private val operacionDao: OperacionDao,
@@ -55,6 +58,7 @@ class MotorSincronizacion @Inject constructor(
     private val activoDao: ActivoDao,
     private val api: DanosApi,
     private val preferencias: PreferenciasLocales,
+    private val identidad: IdentidadRepositorio? = null,
 ) {
 
     suspend fun ejecutarCiclo(): DesenlaceCiclo {
@@ -76,6 +80,11 @@ class MotorSincronizacion @Inject constructor(
 
     suspend fun enviarSiguienteLote(): ResultadoLote {
         val configuracion = preferencias.actual() ?: return ResultadoLote.Detenido
+        if (operacionDao.contar() == 0) return ResultadoLote.ColaVacia
+
+        // Antes de tocar la cola o incrementar intentos, asegura que el token OIDC esté vigente (DT-13, AD-44).
+        verificarIdentidadAntesDeSincronizar()?.let { return it }
+
         val lote = tomarLote()
         if (lote.isEmpty()) return ResultadoLote.ColaVacia
 
@@ -93,13 +102,16 @@ class MotorSincronizacion @Inject constructor(
         )
 
         return when (val respuesta = llamarApi { api.sincronizar(cuerpo) }) {
-            is Resultado.Error -> {
-                if (respuesta.tipo == TipoError.CLIENTE) {
-                    operacionDao.guardarError(lote.map { it.idOperacion }, respuesta.mensaje)
-                    ResultadoLote.Detenido
-                } else {
+            is Resultado.Error -> when (respuesta.tipo) {
+                TipoError.NO_PERMITIDO -> {
+                    identidad?.marcarReautenticacionRequerida()
                     ResultadoLote.Reintentar
                 }
+                TipoError.CLIENTE -> {
+                    operacionDao.guardarError(lote.map { it.idOperacion }, respuesta.mensaje)
+                    ResultadoLote.Detenido
+                }
+                else -> ResultadoLote.Reintentar
             }
             is Resultado.Exito -> {
                 val idsDelLote = lote.mapTo(HashSet()) { it.idOperacion }
@@ -108,6 +120,20 @@ class MotorSincronizacion @Inject constructor(
                     .count { aplicarResultado(it) }
                 if (aplicadas > 0) ResultadoLote.Avance else ResultadoLote.SinAvance
             }
+        }
+    }
+
+    private suspend fun verificarIdentidadAntesDeSincronizar(): ResultadoLote? {
+        val repoIdentidad = identidad ?: return null
+        val config = preferencias.actual() ?: return ResultadoLote.Detenido
+        if (BuildConfig.DEBUG && config.modoEncabezados) return null
+        return when (repoIdentidad.obtenerTokenFresco()) {
+            is ResultadoToken.Exito, ResultadoToken.ModoEncabezados -> null
+            is ResultadoToken.SesionExpirada -> {
+                repoIdentidad.marcarReautenticacionRequerida()
+                ResultadoLote.Reintentar
+            }
+            is ResultadoToken.ErrorRed -> ResultadoLote.Reintentar
         }
     }
 
@@ -167,10 +193,14 @@ class MotorSincronizacion @Inject constructor(
             true
         }
 
-    /** Devuelve false si conviene reintentar (sin red o 5xx). Un 4xx no se reintenta en bucle. */
+    /** Devuelve false si conviene reintentar (sin red, 5xx o sesión expirada). Un 4xx no se reintenta en bucle. */
     suspend fun subirEvidenciasPendientes(): Boolean {
+        val pendientes = evidenciaDao.pendientesDeSubir()
+        if (pendientes.isEmpty()) return true
+        if (verificarIdentidadAntesDeSincronizar() != null) return false
+
         var completo = true
-        for (evidencia in evidenciaDao.pendientesDeSubir()) {
+        for (evidencia in pendientes) {
             val archivo = File(evidencia.rutaArchivo)
             if (!archivo.isFile) continue
             when (subir(evidencia, archivo)) {
@@ -195,6 +225,10 @@ class MotorSincronizacion @Inject constructor(
                 if (respuesta.tipo == TipoError.SIN_RED) DesenlaceSubida.SIN_RED else DesenlaceSubida.ERROR_SERVIDOR
             is Resultado.Exito -> when {
                 respuesta.valor.isSuccessful -> DesenlaceSubida.SUBIDA
+                respuesta.valor.code() == 401 -> {
+                    identidad?.marcarReautenticacionRequerida()
+                    DesenlaceSubida.SIN_RED
+                }
                 errorHttp(respuesta.valor.code()).tipo == TipoError.CLIENTE -> DesenlaceSubida.RECHAZADA
                 else -> DesenlaceSubida.ERROR_SERVIDOR
             }

@@ -230,7 +230,7 @@ private fun SeccionActivo(estado: EvaluarEstado, acciones: EvaluarAcciones) {
     Text(stringResource(R.string.campo_activo), style = MaterialTheme.typography.titleSmall)
     val formulario = estado.formulario
     if (estado.esEdicion) {
-        Text(estado.activoElegido?.referencia ?: formulario.activoId.orEmpty())
+        Text(estado.activoElegido?.referenciaConMunicipio ?: formulario.activoId.orEmpty())
         return
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -261,11 +261,11 @@ private fun SeccionActivo(estado: EvaluarEstado, acciones: EvaluarAcciones) {
         error = estado.errores[CampoEvaluacion.ACTIVO],
     )
     estado.activoElegido?.let {
-        Text(stringResource(R.string.activo_elegido, it.referencia), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.activo_elegido, it.referenciaConMunicipio), style = MaterialTheme.typography.bodyMedium)
     }
     estado.activosFiltrados.forEach { activo ->
         Text(
-            text = "${activo.referencia} · ${estado.tipos.firstOrNull { it.codigo == activo.tipoCodigo }?.nombre ?: activo.tipoCodigo}",
+            text = "${activo.referenciaConMunicipio} · ${estado.tipos.firstOrNull { it.codigo == activo.tipoCodigo }?.nombre ?: activo.tipoCodigo}",
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { acciones.alElegirActivo(activo) }

@@ -8,8 +8,12 @@ import com.example.danos.acceso.DispositivoRepositorio
 import com.example.danos.acceso.DispositivoRepositorioImpl
 import com.example.danos.acceso.EvaluacionRepositorio
 import com.example.danos.acceso.EvaluacionRepositorioImpl
+import com.example.danos.acceso.IdentidadRepositorio
 import com.example.danos.acceso.SincronizacionRepositorio
 import com.example.danos.acceso.SincronizacionRepositorioImpl
+import com.example.danos.infraestructura.identidad.CifradorAndroidKeystore
+import com.example.danos.infraestructura.identidad.CifradorDatos
+import com.example.danos.infraestructura.identidad.IdentidadRepositorioImpl
 import com.example.danos.infraestructura.local.EjecutorTransaccion
 import com.example.danos.infraestructura.local.EjecutorTransaccionRoom
 import com.example.danos.infraestructura.preferencias.PreferenciasDataStore
@@ -26,6 +30,8 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 abstract class ModuloEnlaces {
     @Binds @Singleton abstract fun preferencias(impl: PreferenciasDataStore): PreferenciasLocales
+    @Binds @Singleton abstract fun cifrador(impl: CifradorAndroidKeystore): CifradorDatos
+    @Binds @Singleton abstract fun identidad(impl: IdentidadRepositorioImpl): IdentidadRepositorio
     @Binds abstract fun transaccion(impl: EjecutorTransaccionRoom): EjecutorTransaccion
     @Binds abstract fun programador(impl: ProgramadorWorkManager): ProgramadorSincronizacion
     @Binds abstract fun configuracion(impl: ConfiguracionRepositorioImpl): ConfiguracionRepositorio
