@@ -101,7 +101,7 @@ data class ResumenEvaluacion(
 )
 
 const val MENSAJE_INICIAR_SESION = "Inicie sesión para sincronizar"
-const val EMISOR_OIDC_POR_DEFECTO = "http://10.0.2.2:8180/realms/plataforma"
+const val EMISOR_OIDC_POR_DEFECTO = "http://localhost:8180/realms/plataforma"
 
 /** Identidad extraída del token OIDC según el contrato del realm "plataforma" (DA-15). */
 data class SesionIdentidad(

@@ -10,7 +10,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * En release exige estrictamente HTTPS (H-72).
- * En debug admite también HTTP para conectarse al Keycloak local del emulador (http://10.0.2.2:8180).
+ * En debug admite también HTTP para conectarse al Keycloak local desde el emulador
+ * (http://localhost:8180 con `adb reverse tcp:8180 tcp:8180`).
  */
 class ConexionOidcBuilder(
     private val permitirHttpDesarrollo: Boolean = BuildConfig.DEBUG,

@@ -249,6 +249,6 @@ class IngresoViewModel @Inject constructor(
         if (exigirHttps) {
             "Escribe una URL HTTPS válida para el emisor OIDC"
         } else {
-            "Escribe una URL válida para el emisor, por ejemplo http://10.0.2.2:8180/realms/plataforma"
+            "Escribe una URL válida para el emisor, por ejemplo http://localhost:8180/realms/plataforma"
         }
 }

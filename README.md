@@ -22,7 +22,8 @@ La app se autentica mediante **OpenID Connect (Authorization Code + PKCE S256)**
 - **Cliente OIDC:** `movil` (público, sin secreto en el APK).
 - **Scopes:** `openid profile offline_access`.
 - **URI de redirección:** `co.plataforma.danos:/oauth2redirect`.
-- **Emisor por defecto:** `http://10.0.2.2:8180/realms/plataforma` (configurable en la pantalla **Ingreso**; se descubre mediante `/.well-known/openid-configuration`).
+- **Emisor por defecto:** `http://localhost:8180/realms/plataforma` (configurable en la pantalla **Ingreso**; se descubre mediante `/.well-known/openid-configuration`).
+  - **En el emulador de Android:** ejecute antes `adb reverse tcp:8180 tcp:8180` en el computador para reenviar el puerto `8180` del emulador al host. Así la app conversa con `http://localhost:8180/realms/plataforma` y el claim `iss` del JWT coincide exactamente con el emisor que validan el gateway y los microservicios (DA-15).
 - **Gateway por defecto en `debug`:** `http://10.0.2.2:8080`. En `release` el valor inicial es `https://` y exige configurar un servidor HTTPS.
 - **Identidad desde el token:** el evaluador (`preferred_username`) y la organización (claim `organizacion`) se extraen del JWT y llenan `EvaluacionDto`. En modo OIDC el cliente HTTP envía `Authorization: Bearer <access token>` y `X-Dispositivo`, y **no** envía `X-Usuario` ni `X-Organizacion`.
 - **Almacenamiento cifrado y renovación:** el estado OIDC (`AuthState`) se cifra con una llave AES-256-GCM del **Android Keystore** antes de guardarse en DataStore y nunca se escribe en texto plano ni en logs. Antes de cada sincronización (en segundo plano con `SincronizacionWorker` o en primer plano) se ejecuta `AuthState.performActionWithFreshTokens`.
@@ -82,14 +83,18 @@ Con un emulador o dispositivo conectado:
 ./gradlew connectedDebugAndroidTest
 ```
 
-La prueba `ContratoServidorTest` acepta parámetros por `AndroidJUnitRunner` (`urlApi`, `urlEmisor`, `modoIdentidad`):
+La prueba `ContratoServidorTest` acepta parámetros por `AndroidJUnitRunner` (`urlApi`, `urlEmisor`, `modoIdentidad`).
+Para ejecutarla en modo OIDC desde el emulador contra Keycloak (`:8180`) y los servicios en compose (`IDENTIDAD_MODO=Jwt`), habilite primero el túnel de puerto con `adb reverse`:
 
 ```bash
-# Contra el gateway (:8080) y Keycloak (:8180) usando token de prueba (evaluador.armenia / evaluador.armenia_local)
+# 1. Reenviar el puerto 8180 del emulador al Keycloak del host para que el emisor (iss) coincida
+adb reverse tcp:8180 tcp:8180
+
+# 2. Contra el gateway (:8080) y Keycloak (http://localhost:8180/realms/plataforma) usando token de prueba (evaluador.armenia / evaluador.armenia_local)
 ./gradlew connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=com.example.danos.infraestructura.sync.ContratoServidorTest \
   -Pandroid.testInstrumentationRunnerArguments.urlApi=http://10.0.2.2:8080 \
-  -Pandroid.testInstrumentationRunnerArguments.urlEmisor=http://10.0.2.2:8180/realms/plataforma \
+  -Pandroid.testInstrumentationRunnerArguments.urlEmisor=http://localhost:8180/realms/plataforma \
   -Pandroid.testInstrumentationRunnerArguments.modoIdentidad=oidc
 
 # En modo encabezados contra el servidor de desarrollo (:5080)

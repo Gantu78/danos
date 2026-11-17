@@ -58,8 +58,14 @@ import kotlin.random.Random
  * Prueba de contrato contra el servidor real (gateway en :8080 o API directa en :5080).
  * Parametrizable por argumentos de instrumentación:
  * - `-e urlApi http://10.0.2.2:8080`
- * - `-e urlEmisor http://10.0.2.2:8180/realms/plataforma`
+ * - `-e urlEmisor http://localhost:8180/realms/plataforma`
  * - `-e modoIdentidad auto|oidc|encabezados`
+ *
+ * Para que el emulador alcance a Keycloak en `http://localhost:8180/realms/plataforma` y el claim `iss`
+ * coincida con el que validan los servicios (`Identidad:Emisor`), ejecute antes en el host:
+ * ```
+ * adb reverse tcp:8180 tcp:8180
+ * ```
  *
  * En modo OIDC obtiene un token de prueba por Resource Owner Password **solo dentro de esta prueba**
  * con el usuario `evaluador.armenia` y clave `evaluador.armenia_local` (cliente `movil`).
@@ -369,7 +375,7 @@ class ContratoServidorTest {
     private companion object {
         const val URL_GATEWAY_DEFECTO = "http://10.0.2.2:8080"
         const val URL_API_DIRECTA_DEFECTO = "http://10.0.2.2:5080"
-        const val URL_EMISOR_DEFECTO = "http://10.0.2.2:8180/realms/plataforma"
+        const val URL_EMISOR_DEFECTO = "http://localhost:8180/realms/plataforma"
         const val USUARIO_OIDC_PRUEBA = "evaluador.armenia"
         const val CLAVE_OIDC_PRUEBA = "evaluador.armenia_local"
         const val ORGANIZACION_OIDC_PRUEBA = "alcaldia-armenia"

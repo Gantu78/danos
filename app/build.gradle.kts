@@ -39,7 +39,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         manifestPlaceholders["appAuthRedirectScheme"] = "co.plataforma.danos"
-        buildConfigField("String", "EMISOR_OIDC_DEFECTO", "\"http://10.0.2.2:8180/realms/plataforma\"")
+        buildConfigField("String", "EMISOR_OIDC_DEFECTO", "\"http://localhost:8180/realms/plataforma\"")
     }
 
     signingConfigs {

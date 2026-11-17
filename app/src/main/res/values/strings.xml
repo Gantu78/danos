@@ -15,7 +15,7 @@
     <string name="campo_url_api">URL del servidor (gateway)</string>
     <string name="ayuda_url_api">En el emulador: http://10.0.2.2:8080. En producción use https://.</string>
     <string name="campo_url_emisor">Emisor OIDC</string>
-    <string name="ayuda_url_emisor">Por defecto: http://10.0.2.2:8180/realms/plataforma (se descubre con /.well-known/openid-configuration).</string>
+    <string name="ayuda_url_emisor">Por defecto: http://localhost:8180/realms/plataforma (en el emulador ejecute adb reverse tcp:8180 tcp:8180; se descubre con /.well-known/openid-configuration).</string>
     <string name="probar_conexion">Probar conexión</string>
     <string name="iniciar_sesion">Iniciar sesión</string>
     <string name="cerrar_sesion">Cerrar sesión</string>
