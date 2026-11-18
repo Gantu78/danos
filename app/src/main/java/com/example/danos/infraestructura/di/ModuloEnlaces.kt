@@ -4,6 +4,8 @@ import com.example.danos.acceso.CatalogoRepositorio
 import com.example.danos.acceso.CatalogoRepositorioImpl
 import com.example.danos.acceso.ConfiguracionRepositorio
 import com.example.danos.acceso.ConfiguracionRepositorioImpl
+import com.example.danos.acceso.DesastreRepositorio
+import com.example.danos.acceso.DesastreRepositorioImpl
 import com.example.danos.acceso.DispositivoRepositorio
 import com.example.danos.acceso.DispositivoRepositorioImpl
 import com.example.danos.acceso.EvaluacionRepositorio
@@ -39,4 +41,5 @@ abstract class ModuloEnlaces {
     @Binds abstract fun evaluacion(impl: EvaluacionRepositorioImpl): EvaluacionRepositorio
     @Binds abstract fun sincronizacion(impl: SincronizacionRepositorioImpl): SincronizacionRepositorio
     @Binds abstract fun dispositivo(impl: DispositivoRepositorioImpl): DispositivoRepositorio
+    @Binds abstract fun desastre(impl: DesastreRepositorioImpl): DesastreRepositorio
 }

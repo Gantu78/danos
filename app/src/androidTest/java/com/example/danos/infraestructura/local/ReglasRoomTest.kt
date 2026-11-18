@@ -243,7 +243,7 @@ class ReglasRoomTest {
 
         val contexto = ApplicationProvider.getApplicationContext<Context>()
         val bdMigrada = Room.databaseBuilder(contexto, AppDatabase::class.java, nombreBd)
-            .addMigrations(MIGRACION_1_2)
+            .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
             .build()
         try {
             val evalConservada = bdMigrada.evaluacionDao().obtener("eval-pendiente")
@@ -252,6 +252,33 @@ class ReglasRoomTest {
             assertEquals(1, bdMigrada.operacionDao().contar())
             assertEquals("op-1", bdMigrada.operacionDao().obtener("op-1")?.idOperacion)
             assertEquals(1, bdMigrada.catalogoDao().obtenerTipo("VIV")?.version)
+        } finally {
+            bdMigrada.close()
+            contexto.deleteDatabase(nombreBd)
+        }
+    }
+
+    @Test
+    fun migracionDe2A3AgregaRegistroDeDesastresSinTocarLaCola() = runTest {
+        val nombreBd = "migracion-2-3-danos.db"
+        ayudanteMigracion.createDatabase(nombreBd, 2).apply {
+            execSQL(
+                """INSERT INTO `operacion` (`idOperacion`, `tipo`, `evaluacionId`, `activoId`,
+                   `versionBaseActivo`, `payloadJson`, `creada`, `intentos`, `ultimoError`)
+                   VALUES ('op-2', 'CREAR', 'eval-x', 'a-x', NULL, '{"id":"eval-x"}', 1772360000000, 0, NULL)""",
+            )
+            close()
+        }
+
+        ayudanteMigracion.runMigrationsAndValidate(nombreBd, 3, true, MIGRACION_2_3).close()
+
+        val contexto = ApplicationProvider.getApplicationContext<Context>()
+        val bdMigrada = Room.databaseBuilder(contexto, AppDatabase::class.java, nombreBd)
+            .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
+            .build()
+        try {
+            assertEquals(1, bdMigrada.operacionDao().contar())
+            assertEquals(0, bdMigrada.registroDesastreDao().pendientes().size)
         } finally {
             bdMigrada.close()
             contexto.deleteDatabase(nombreBd)

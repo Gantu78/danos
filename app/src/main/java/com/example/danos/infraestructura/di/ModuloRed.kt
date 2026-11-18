@@ -3,6 +3,7 @@ package com.example.danos.infraestructura.di
 import com.example.danos.BuildConfig
 import com.example.danos.infraestructura.remoto.ConfiguracionInterceptor
 import com.example.danos.infraestructura.remoto.DanosApi
+import com.example.danos.infraestructura.remoto.DesastresApi
 import com.example.danos.infraestructura.remoto.JsonDanos
 import dagger.Module
 import dagger.Provides
@@ -56,4 +57,8 @@ object ModuloRed {
     @Provides
     @Singleton
     fun api(retrofit: Retrofit): DanosApi = retrofit.create(DanosApi::class.java)
+
+    @Provides
+    @Singleton
+    fun apiDesastres(retrofit: Retrofit): DesastresApi = retrofit.create(DesastresApi::class.java)
 }

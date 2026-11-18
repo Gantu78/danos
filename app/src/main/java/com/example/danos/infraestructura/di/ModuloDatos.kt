@@ -12,6 +12,8 @@ import com.example.danos.infraestructura.local.CatalogoDao
 import com.example.danos.infraestructura.local.EvaluacionDao
 import com.example.danos.infraestructura.local.EvidenciaDao
 import com.example.danos.infraestructura.local.MIGRACION_1_2
+import com.example.danos.infraestructura.local.MIGRACION_2_3
+import com.example.danos.infraestructura.local.RegistroDesastreDao
 import com.example.danos.infraestructura.local.OperacionDao
 import dagger.Module
 import dagger.Provides
@@ -29,7 +31,7 @@ object ModuloDatos {
     @Singleton
     fun baseDatos(@ApplicationContext contexto: Context): AppDatabase =
         Room.databaseBuilder(contexto, AppDatabase::class.java, "danos.db")
-            .addMigrations(MIGRACION_1_2)
+            .addMigrations(MIGRACION_1_2, MIGRACION_2_3)
             .build()
 
     @Provides fun catalogoDao(baseDatos: AppDatabase): CatalogoDao = baseDatos.catalogoDao()
@@ -37,6 +39,7 @@ object ModuloDatos {
     @Provides fun evaluacionDao(baseDatos: AppDatabase): EvaluacionDao = baseDatos.evaluacionDao()
     @Provides fun evidenciaDao(baseDatos: AppDatabase): EvidenciaDao = baseDatos.evidenciaDao()
     @Provides fun operacionDao(baseDatos: AppDatabase): OperacionDao = baseDatos.operacionDao()
+    @Provides fun registroDesastreDao(baseDatos: AppDatabase): RegistroDesastreDao = baseDatos.registroDesastreDao()
 
     @Provides
     @Singleton
