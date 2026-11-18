@@ -87,6 +87,16 @@ class MotorSincronizacionTest {
     }
 
     @Test
+    fun `el estado DUPLICADO del servidor se refleja en la app`() = runTest {
+        encolarUna()
+        responderTodas("APLICADA", estado = "DUPLICADO")
+
+        motor.ejecutarCiclo()
+
+        assertEquals(EstadoEvaluacion.DUPLICADO, evaluaciones.filas.getValue("eval-1").estadoEvaluacion)
+    }
+
+    @Test
     fun `EN_CONFLICTO borra la operacion, confirma y marca en conflicto`() = runTest {
         encolarUna()
         responderTodas("EN_CONFLICTO", estado = "EN_CONFLICTO")

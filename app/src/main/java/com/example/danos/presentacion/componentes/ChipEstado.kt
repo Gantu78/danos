@@ -26,6 +26,7 @@ fun EstadoEvaluacion.tono(): TonoChip = when (this) {
     EstadoEvaluacion.VALIDADA -> TonoChip.EXITO
     EstadoEvaluacion.EN_CONFLICTO -> TonoChip.AVISO
     EstadoEvaluacion.RECHAZADA -> TonoChip.ERROR
+    EstadoEvaluacion.DUPLICADO -> TonoChip.NEUTRO
 }
 
 fun EstadoSync.tono(): TonoChip = when (this) {

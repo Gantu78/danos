@@ -20,6 +20,9 @@ enum class EstadoEvaluacion(val etiqueta: String) {
     EN_CONFLICTO("En conflicto"),
     VALIDADA("Validada"),
     RECHAZADA("Rechazada"),
+
+    /** Descartada en la consola al fusionar dos posibles duplicados (E-14). El servidor conserva sus versiones. */
+    DUPLICADO("Duplicada"),
 }
 
 enum class EstadoSync(val etiqueta: String) {
