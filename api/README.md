@@ -1,5 +1,13 @@
 # Microservicio de Evaluación de Daños
 
+> **Prototipo inicial, reemplazado.** Este API fue la primera versión del servidor de FP-06 (Anexo A del SAD).
+> La versión vigente es `proyectoparte2/servicios/evaluacion-danos`, que es la que levanta el compose de la
+> plataforma detrás del gateway (`http://localhost:8080`), con identidad OIDC (JWT de Keycloak), bus de
+> eventos con bandeja de salida (AD-45), evidencias en MinIO, validación, resolución de conflictos y descarga
+> incremental. Este prototipo se conserva como referencia y para el modo de transición de la app (`debug`,
+> identidad por encabezados, puerto 5080): **no acepta el modo OIDC de la app** (exige `X-Usuario` y
+> `X-Organizacion`), ignora `zona` y `desde` en la descarga y no conoce el estado `DUPLICADO`.
+
 API en ASP.NET Core (.NET 10) + EF Core + PostgreSQL 18 que recibe por lotes las evaluaciones que la app
 móvil registró sin conexión. Detecta conflictos (regla determinista por versión del activo) y posibles
 duplicados (Haversine ≤ 25 m, ±24 h) sin resolverlos nunca: conserva ambas versiones para revisión humana.

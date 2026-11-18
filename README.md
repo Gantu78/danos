@@ -9,7 +9,7 @@ App móvil que registra la **posición (lat/lon)** y el **nivel de afectación (
 | Diseño (LaTeX para Overleaf) | [docs/latex/](docs/latex/): `main.tex`, diagramas Mermaid y `DanosCampo-diseno-overleaf.zip` |
 | Diseño (resumen en Markdown) | [docs/DISENO.md](docs/DISENO.md) |
 | Código de la app Android | [app/](app/) (Kotlin, Jetpack Compose, `applicationId = co.plataforma.danos`, v2.0.0) |
-| Código del sistema central (prototipo inicial) | [api/](api/) (ASP.NET Core .NET 10 + PostgreSQL) |
+| Código del sistema central (prototipo inicial, reemplazado) | [api/](api/) (ASP.NET Core .NET 10 + PostgreSQL). La versión vigente es `proyectoparte2/servicios/evaluacion-danos`, detrás del gateway |
 | Ejemplo de configuración de firma | [keystore.properties.ejemplo](keystore.properties.ejemplo) |
 
 ## 1. Inicio de sesión OIDC y modo de transición
@@ -110,7 +110,7 @@ Si el servidor no responde, `ContratoServidorTest` se omite automáticamente con
 
 ```
 ├── app/                         App Android (presentacion · acceso · dominio · infraestructura)
-├── api/                         API .NET del prototipo inicial y simulador de QA-14
+├── api/                         API .NET del prototipo inicial (reemplazado) y simulador de QA-14
 ├── docs/DISENO.md               Arquitectura, modelo de datos, sincronización y mapa de calor
 ├── keystore.properties.ejemplo  Plantilla para firmar la variante release
 └── docker-compose.yml           API + PostgreSQL del prototipo inicial
