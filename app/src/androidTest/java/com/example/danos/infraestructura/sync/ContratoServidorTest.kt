@@ -27,7 +27,11 @@ import com.example.danos.infraestructura.local.AppDatabase
 import com.example.danos.infraestructura.local.EjecutorTransaccionRoom
 import com.example.danos.infraestructura.preferencias.PreferenciasLocales
 import com.example.danos.infraestructura.remoto.ConfiguracionInterceptor
+import com.example.danos.infraestructura.remoto.DesastresApi
 import com.example.danos.infraestructura.remoto.JsonDanos
+import com.example.danos.infraestructura.local.aEntidad
+import com.example.danos.dominio.RegistroDesastre
+import com.example.danos.dominio.SeveridadDesastre
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -81,6 +85,7 @@ class ContratoServidorTest {
     private var usarModoEncabezados: Boolean = false
     private var tokenOidcPrueba: String? = null
     private var sesionOidcPrueba: SesionIdentidad? = null
+    private var urlEmisorPrueba: String = URL_EMISOR_DEFECTO
 
     /** Un celular: su propia base local y su propio idDispositivo. */
     private inner class Dispositivo(evaluadorPorDefecto: String) {
@@ -184,6 +189,7 @@ class ContratoServidorTest {
         val modo = (args.getString("modoIdentidad") ?: "auto").trim().lowercase()
         val usuario = args.getString("usuarioOidc") ?: USUARIO_OIDC_PRUEBA
         val clave = args.getString("claveOidc") ?: CLAVE_OIDC_PRUEBA
+        urlEmisorPrueba = urlEmisor
 
         val cliente = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
         val candidatas = if (urlArg != null) listOf(urlArg) else listOf(URL_GATEWAY_DEFECTO, URL_API_DIRECTA_DEFECTO)
@@ -370,6 +376,93 @@ class ContratoServidorTest {
         celular.motor.ejecutarCiclo()
 
         assertEquals(EstadoSync.CONFIRMADA, celular.evaluaciones.obtener(mala.id)!!.estadoSync)
+    }
+
+    /** API de Gestión de Desastres autenticada con un token de [usuario] (cliente movil, solo en pruebas). */
+    private fun apiDesastresComo(usuario: String): DesastresApi? {
+        val cliente = OkHttpClient.Builder().connectTimeout(3, TimeUnit.SECONDS).build()
+        val (token, sesion) = obtenerTokenDirectAccessGrant(cliente, urlEmisorPrueba, usuario, "${usuario}_local") ?: return null
+        val config = Configuracion(sesion.usuario, sesion.organizacion, urlBaseEfectiva, "contrato-${UUID.randomUUID()}")
+        val preferencias = object : PreferenciasLocales {
+            override val configuracion: Flow<Configuracion?> = flowOf(config)
+            override val ultimaDescarga: Flow<Instant?> = flowOf(null)
+            override suspend fun actual() = config
+            override suspend fun guardar(evaluador: String, organizacion: String, urlApi: String) = Unit
+            override suspend fun guardarUltimaDescarga(instante: Instant) = Unit
+            override suspend fun obtenerMarcadorDesde(): String? = null
+            override suspend fun guardarMarcadorDesde(desde: String?) = Unit
+        }
+        val identidad = object : IdentidadRepositorio {
+            override val sesion: Flow<SesionIdentidad?> = flowOf(sesion)
+            override val requiereInicioSesion: Flow<Boolean> = flowOf(false)
+            override suspend fun sesionActual(): SesionIdentidad = sesion
+            override suspend fun prepararInicioSesion(urlEmisor: String): Resultado<Intent> =
+                Resultado.Error(TipoError.CLIENTE, "No usado en prueba")
+            override suspend fun procesarRespuestaAutorizacion(datosResultado: Intent?): Resultado<SesionIdentidad> =
+                Resultado.Error(TipoError.CLIENTE, "No usado en prueba")
+            override suspend fun obtenerTokenFresco(): ResultadoToken = ResultadoToken.Exito(token, sesion)
+            override suspend fun marcarReautenticacionRequerida() = Unit
+            override suspend fun cerrarSesion(): Resultado<Unit> = Resultado.Exito(Unit)
+        }
+        // Como el build debug: HTTP permitido, pero con modoEncabezados = false se envía el Bearer del token.
+        val interceptor = ConfiguracionInterceptor(preferencias = preferencias, identidad = identidad, permitirModoEncabezados = true)
+        return ModuloRed.apiDesastres(ModuloRed.retrofit(ModuloRed.clienteHttp(interceptor)))
+    }
+
+    private fun registroDeCampo(id: String = UUID.randomUUID().toString()) = RegistroDesastre(
+        id = id, tipo = "INUNDACION", nombre = "Contrato: creciente del río Quindío",
+        descripcion = "Registro de prueba desde la app de campo", instanteInicio = Instant.now().minusSeconds(3_600),
+        lat = 4.5339, lon = -75.6811, precisionM = 8.0, severidad = SeveridadDesastre.NIVEL_2, responsable = "bomberos",
+        radioZonaM = 500, codigosMunicipio = emptyList(), autor = "bomberos.operador", organizacion = "bomberos",
+        instanteRegistro = Instant.now(),
+    )
+
+    @Test
+    fun unOrganismoRegistraUnDesastreDesdeCampoYElReenvioNoLoDuplica() = runTest {
+        assumeTrue("El registro de desastres requiere OIDC contra el gateway", !usarModoEncabezados)
+        val api = apiDesastresComo("bomberos.operador")
+        assumeTrue("No se obtuvo token para bomberos.operador", api != null)
+        val bd = Room.inMemoryDatabaseBuilder(contexto, AppDatabase::class.java).build()
+        try {
+            val dao = bd.registroDesastreDao()
+            val enviador = EnviadorDesastres(dao, api!!)
+            val registro = registroDeCampo()
+            dao.insertar(registro.aEntidad())
+
+            assertTrue(enviador.actualizarTipos())
+            assertTrue(dao.observarTipos().first().any { it.codigo == "INUNDACION" })
+            assertTrue(enviador.enviarPendientes())
+            assertEquals("ENVIADO", dao.observarTodos().first().single().estadoEnvio)
+
+            // Reenvío del mismo id (por ejemplo, la respuesta se perdió): el servidor devuelve el mismo desastre.
+            dao.actualizarEstado(registro.id, "PENDIENTE", null)
+            assertTrue(enviador.enviarPendientes())
+            val fila = dao.observarTodos().first().single()
+            assertEquals("ENVIADO", fila.estadoEnvio)
+            assertEquals(null, fila.motivoRechazo)
+        } finally {
+            bd.close()
+        }
+    }
+
+    @Test
+    fun unEvaluadorSinRolOrganismoRecibeRechazoConMotivo() = runTest {
+        assumeTrue("El registro de desastres requiere OIDC contra el gateway", !usarModoEncabezados)
+        val api = apiDesastresComo(USUARIO_OIDC_PRUEBA)
+        assumeTrue("No se obtuvo token para $USUARIO_OIDC_PRUEBA", api != null)
+        val bd = Room.inMemoryDatabaseBuilder(contexto, AppDatabase::class.java).build()
+        try {
+            val dao = bd.registroDesastreDao()
+            dao.insertar(registroDeCampo().aEntidad())
+
+            assertTrue(EnviadorDesastres(dao, api!!).enviarPendientes())
+
+            val fila = dao.observarTodos().first().single()
+            assertEquals("RECHAZADO", fila.estadoEnvio)
+            assertTrue(fila.motivoRechazo!!.contains("organismo o autoridad"))
+        } finally {
+            bd.close()
+        }
     }
 
     private companion object {
