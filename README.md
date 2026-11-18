@@ -1,14 +1,23 @@
 # DanosCampo — Evaluación de daños en sitios de desastre
 
-App móvil que registra la **posición (lat/lon)** y el **nivel de afectación (1 a 5)** de sitios de desastre,
-**funciona sin internet** y **sincroniza** con el sistema central al volver la red.
+App móvil de campo de la Plataforma para la Gestión de Desastres y Reconstrucción. **Registra y caracteriza un
+desastre** desde el sitio, registra la **posición (lat/lon)** y el **nivel de afectación (1 a 5)** de los activos
+dañados, **funciona sin internet** y **sincroniza** con la plataforma a través del gateway al volver la red.
+
+> **Versión 2.1.0** (`versionCode 3`). APK de entrega: [entrega/DanosCampo.apk](entrega/DanosCampo.apk), variante
+> `debug` (admite `http://` para el emulador y un computador en la misma red). Verificada contra el gateway y Keycloak
+> de `proyectoparte2` el 18 de noviembre de 2026: 81 pruebas unitarias y 16 instrumentadas en verde (sección 3).
+>
+> `docs/DISENO.md`, `docs/DISENO.pdf` y `docs/latex/` describen la primera versión (contra `danos/api` en el puerto
+> 5080, sin OIDC). La arquitectura vigente es la del SAD de la plataforma.
 
 | Entregable | Dónde |
 | --- | --- |
 | Diseño (PDF) | [docs/DISENO.pdf](docs/DISENO.pdf) |
 | Diseño (LaTeX para Overleaf) | [docs/latex/](docs/latex/): `main.tex`, diagramas Mermaid y `DanosCampo-diseno-overleaf.zip` |
 | Diseño (resumen en Markdown) | [docs/DISENO.md](docs/DISENO.md) |
-| Código de la app Android | [app/](app/) (Kotlin, Jetpack Compose, `applicationId = co.plataforma.danos`, v2.0.0) |
+| Código de la app Android | [app/](app/) (Kotlin, Jetpack Compose, `applicationId = co.plataforma.danos`, v2.1.0) |
+| APK de entrega | [entrega/DanosCampo.apk](entrega/DanosCampo.apk) (variante `debug`, v2.1.0) |
 | Código del sistema central (prototipo inicial, reemplazado) | [api/](api/) (ASP.NET Core .NET 10 + PostgreSQL). La versión vigente es `proyectoparte2/servicios/evaluacion-danos`, detrás del gateway |
 | Ejemplo de configuración de firma | [keystore.properties.ejemplo](keystore.properties.ejemplo) |
 
@@ -37,7 +46,24 @@ Mientras se prueba contra `danos/api` (puerto `5080`) o contra un servicio sin g
 2. Al activarlo, aparecen los campos manuales de **Evaluador** y **Organización** y la app envía `X-Usuario`, `X-Organizacion` y `X-Dispositivo`.
 3. En la variante `release` este modo **no existe** (ni en la interfaz ni en el interceptor): solo se permite OIDC sobre HTTPS.
 
-## 2. Descarga incremental y filtro por zona
+## 2. Registro y caracterización de un desastre en campo
+
+El ícono de alerta de la lista abre **Desastres registrados en campo**; el botón **Registrar desastre** abre el
+formulario (RF-GD-02, RF-GD-03, RF-GD-05 y RF-GD-08 del SRS):
+
+- **Caracterización:** tipo de evento (catálogo vigente del servidor, `GET /v1/catalogos/tipos-desastre`; sin red usa
+  los tipos de RN-1), nombre, descripción, nivel RN-3 (1 a 4), hora de inicio y organismo responsable.
+- **Zona afectada:** la ubicación GPS y un polígono de 100 m, 500 m, 1 km o 5 km alrededor del punto (fuente
+  `EVALUACION_CAMPO`), y los municipios DIVIPOLA que se conozcan.
+- **Sin conexión:** el registro se guarda en Room (tabla `registro_desastre`, versión 3 de la base, migración 2 a 3
+  aditiva) y lo envía el mismo `SincronizacionWorker`, antes que las evaluaciones (AD-44).
+- **Reenvío idempotente:** el teléfono genera el `id` del desastre y lo manda en `POST /v1/desastres`; si la respuesta
+  se pierde y se reenvía, el servidor devuelve el mismo desastre.
+- **Permiso:** registrar exige el rol `organismo` o `autoridad` (usuario de prueba `bomberos.operador`). Con otro rol el
+  formulario lo advierte y el registro queda **Rechazado** con el motivo al sincronizar. Sin red, 5xx o sesión vencida
+  el registro sigue **Pendiente** y se reintenta.
+
+## 3. Descarga incremental y filtro por zona
 
 La pantalla **Descarga** consume `GET /v1/descarga?desastreId={guid}&zona={divipola}&desde={instanteServidor}`:
 
@@ -47,9 +73,9 @@ La pantalla **Descarga** consume `GET /v1/descarga?desastreId={guid}&zona={divip
   - Si responde `incremental = false`, aplica una descarga completa. Los desastres que dejan de llegar en una descarga completa se retiran de la base local **solo si no tienen evaluaciones pendientes de sincronizar**.
 - **Descarga completa:** el botón **"Descarga completa"** borra el marcador `desde` y fuerza la descarga íntegra del catálogo y activos.
 - **Municipio del activo:** cuando un activo incluye `codigoMunicipio`, se muestra junto a su referencia (`Referencia (DIVIPOLA)`).
-- **Migración de base de datos local:** Room migra de la versión 1 a la 2 mediante `MIGRACION_1_2` explícita (esquemas exportados en `app/schemas/`), conservando todas las evaluaciones y operaciones pendientes.
+- **Migración de base de datos local:** Room migra de la versión 1 a la 2 (`MIGRACION_1_2`) y de la 2 a la 3 (`MIGRACION_2_3`, registro de desastres), con los esquemas exportados en `app/schemas/`, conservando todas las evaluaciones y operaciones pendientes.
 
-## 3. Compilar, probar y firmar la variante `release`
+## 4. Compilar, probar y firmar la variante `release`
 
 ### Compilación y pruebas unitarias (JVM)
 
@@ -79,7 +105,7 @@ La variante `release` tiene `isMinifyEnabled = true` (R8/ProGuard) y exige TLS (
 Con un emulador o dispositivo conectado:
 
 ```bash
-# Todas las pruebas instrumentadas (incluye migración Room 1 -> 2 con MigrationTestHelper)
+# Todas las pruebas instrumentadas (incluye las migraciones Room 1 -> 2 y 2 -> 3 con MigrationTestHelper)
 ./gradlew connectedDebugAndroidTest
 ```
 
@@ -106,7 +132,14 @@ adb reverse tcp:8180 tcp:8180
 
 Si el servidor no responde, `ContratoServidorTest` se omite automáticamente con `assumeTrue`.
 
-## 4. Estructura
+En modo OIDC, `ContratoServidorTest` también registra un desastre como `bomberos.operador` (y verifica que el reenvío
+no lo duplica) y comprueba que `evaluador.armenia` recibe el rechazo por rol.
+
+**Puerto ocupado en Windows.** Si otro programa ocupa el 8080 del computador, levante el gateway en otro puerto
+(`PUERTO_WEB=18080 PUERTO_WEB_REPLICA=18081 docker compose ... up -d`) y pase `urlApi=http://10.0.2.2:18080`.
+Compruebe antes que el puerto esté libre en `127.0.0.1` y no solo en `0.0.0.0`: el emulador llega por `127.0.0.1`.
+
+## 5. Estructura
 
 ```
 ├── app/                         App Android (presentacion · acceso · dominio · infraestructura)
