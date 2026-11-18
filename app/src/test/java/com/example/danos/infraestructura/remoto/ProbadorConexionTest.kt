@@ -15,13 +15,19 @@ import java.io.IOException
 
 class ProbadorConexionTest {
     private var urlPedida: String? = null
+    private val rutasPedidas = mutableListOf<String>()
 
     private fun probador(codigo: Int = 200, cuerpo: String = """{"estado":"ok"}""", fallar: Boolean = false) =
+        probadorPorRuta(fallar) { codigo to cuerpo }
+
+    private fun probadorPorRuta(fallar: Boolean = false, responder: (String) -> Pair<Int, String>) =
         ProbadorConexion(
             OkHttpClient.Builder().addInterceptor(
                 Interceptor { cadena ->
                     urlPedida = cadena.request().url.toString()
+                    rutasPedidas += cadena.request().url.encodedPath
                     if (fallar) throw IOException("sin ruta")
+                    val (codigo, cuerpo) = responder(cadena.request().url.encodedPath)
                     Response.Builder()
                         .request(cadena.request())
                         .protocol(Protocol.HTTP_1_1)
@@ -34,9 +40,25 @@ class ProbadorConexionTest {
         )
 
     @Test
+    fun `contra el gateway basta salud listo aunque salud caiga en la consola web`() = runTest {
+        val gateway = probadorPorRuta { ruta ->
+            if (ruta == "/salud/listo") 200 to """{"servicio":"gateway","estado":"Healthy"}""" else 200 to "<html>consola</html>"
+        }
+        assertTrue(gateway.probar("http://10.0.2.2:8080") is Resultado.Exito)
+        assertEquals(listOf("/salud/listo"), rutasPedidas)
+    }
+
+    @Test
+    fun `contra el prototipo sin salud listo se usa salud`() = runTest {
+        val prototipo = probadorPorRuta { ruta -> if (ruta == "/salud") 200 to """{"estado":"ok"}""" else 404 to "" }
+        assertTrue(prototipo.probar("http://10.0.2.2:5080") is Resultado.Exito)
+        assertEquals(listOf("/salud/listo", "/salud"), rutasPedidas)
+    }
+
+    @Test
     fun `una URL que responde salud es correcta y se prueba sin guardarla`() = runTest {
         assertTrue(probador().probar(" http://192.168.1.10:5080 ") is Resultado.Exito)
-        assertEquals("http://192.168.1.10:5080/salud", urlPedida)
+        assertEquals("http://192.168.1.10:5080/salud/listo", urlPedida)
     }
 
     @Test
