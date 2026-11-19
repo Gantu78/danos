@@ -192,6 +192,7 @@ class IdentidadRepositorioImpl @Inject constructor(
     private fun crearServicioAppAuth(): AuthorizationService {
         val config = AppAuthConfiguration.Builder()
             .setConnectionBuilder(constructorConexion)
+            .setSkipIssuerHttpsCheck(BuildConfig.DEBUG)
             .build()
         return AuthorizationService(contexto, config)
     }
