@@ -8,6 +8,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.danos.presentacion.desastre.DesastresRuta
+import com.example.danos.presentacion.desastre.RegistrarDesastreRuta
 import com.example.danos.presentacion.descarga.DescargaRuta
 import com.example.danos.presentacion.evaluar.EvaluarRuta
 import com.example.danos.presentacion.ingreso.IngresoRuta
@@ -41,7 +43,17 @@ fun AppNavegacion(
                 alEditar = { id -> navController.navigate(RutaEvaluar(evaluacionId = id)) },
                 alAbrirDescarga = { navController.navigate(RutaDescarga) },
                 alAbrirIngreso = { navController.navigate(RutaIngreso) },
+                alAbrirDesastres = { navController.navigate(RutaDesastres) },
             )
+        }
+        composable<RutaDesastres> {
+            DesastresRuta(
+                alVolver = { navController.popBackStack() },
+                alRegistrar = { navController.navigate(RutaRegistrarDesastre) },
+            )
+        }
+        composable<RutaRegistrarDesastre> {
+            RegistrarDesastreRuta(alTerminar = { navController.popBackStack() })
         }
         composable<RutaDescarga> {
             DescargaRuta(alVolver = { navController.popBackStack() })

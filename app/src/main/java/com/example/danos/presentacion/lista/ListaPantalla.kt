@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +48,7 @@ fun ListaRuta(
     alEditar: (String) -> Unit,
     alAbrirDescarga: () -> Unit,
     alAbrirIngreso: () -> Unit,
+    alAbrirDesastres: () -> Unit = {},
     viewModel: ListaViewModel = hiltViewModel(),
 ) {
     val estado by viewModel.estado.collectAsStateWithLifecycle()
@@ -67,6 +69,7 @@ fun ListaRuta(
         alEditar = alEditar,
         alAbrirDescarga = alAbrirDescarga,
         alAbrirIngreso = alAbrirIngreso,
+        alAbrirDesastres = alAbrirDesastres,
     )
 }
 
@@ -80,6 +83,7 @@ fun ListaPantalla(
     alEditar: (String) -> Unit,
     alAbrirDescarga: () -> Unit,
     alAbrirIngreso: () -> Unit,
+    alAbrirDesastres: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -97,6 +101,9 @@ fun ListaPantalla(
                         ) {
                             Icon(Icons.Filled.Sync, stringResource(R.string.sincronizar))
                         }
+                    }
+                    IconButton(onClick = alAbrirDesastres) {
+                        Icon(Icons.Filled.Warning, "Desastres registrados en campo")
                     }
                     IconButton(onClick = alAbrirDescarga) {
                         Icon(Icons.Filled.CloudDownload, stringResource(R.string.descarga_titulo))

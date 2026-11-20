@@ -32,12 +32,14 @@ class ProbadorConexion(private val cliente: OkHttpClient) {
         val base = urlApi.trim().toHttpUrlOrNull()
             ?: return@withContext Resultado.Error(TipoError.CLIENTE, "La URL no es válida")
         try {
-            val primaria = consultarSalud(base, "/salud")
-            if (primaria.codigo == 404) {
-                val alternativa = consultarSalud(base, "/salud/listo")
-                interpretarRespuesta(alternativa)
+            // Primero /salud/listo, que expone el gateway (y cada servicio de la plataforma). El gateway no enruta
+            // /salud: esa ruta cae en la consola web y devuelve su HTML. El prototipo danos/api solo tiene /salud.
+            val listo = consultarSalud(base, "/salud/listo")
+            val esApi = listo.cuerpo.contains("\"estado\"")
+            if (listo.codigo == 404 || (listo.exitosa && !esApi)) {
+                interpretarRespuesta(consultarSalud(base, "/salud"))
             } else {
-                interpretarRespuesta(primaria)
+                interpretarRespuesta(listo)
             }
         } catch (e: CancellationException) {
             throw e

@@ -14,3 +14,9 @@ data object RutaLista
 /** Sin [evaluacionId] es una evaluación nueva; con él, una edición. */
 @Serializable
 data class RutaEvaluar(val evaluacionId: String? = null)
+
+@Serializable
+data object RutaDesastres
+
+@Serializable
+data object RutaRegistrarDesastre

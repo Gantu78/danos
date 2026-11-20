@@ -12,10 +12,14 @@ class SincronizacionWorker @AssistedInject constructor(
     @Assisted contexto: Context,
     @Assisted parametros: WorkerParameters,
     private val motor: MotorSincronizacion,
+    private val desastres: EnviadorDesastres,
 ) : CoroutineWorker(contexto, parametros) {
 
-    override suspend fun doWork(): Result = when (motor.ejecutarCiclo()) {
-        DesenlaceCiclo.TERMINADO -> Result.success()
-        DesenlaceCiclo.REINTENTAR -> Result.retry()
+    /** Primero los desastres registrados en campo y el catálogo de tipos; después la cola de evaluaciones (AD-44). */
+    override suspend fun doWork(): Result {
+        val desastresResueltos = desastres.enviarPendientes()
+        desastres.actualizarTipos()
+        val evaluaciones = motor.ejecutarCiclo()
+        return if (desastresResueltos && evaluaciones == DesenlaceCiclo.TERMINADO) Result.success() else Result.retry()
     }
 }
